@@ -1,0 +1,9 @@
+true: include
+
+true: package(gg, vg)
+true: package(lwt, lwt_react)
+true: package(js_of_ocaml, js_of_ocaml-ppx)
+
+#, js_of_ocaml.log
+
+true: package(tyxml)
