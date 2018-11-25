@@ -4,7 +4,11 @@ module H = Html
 
 let js_div_id = "gaxel" 
 
-let content = H.h1 [ H.pcdata "First page!" ]
+let content = [
+  H.h1 [ H.pcdata "First page!" ];
+  H.div ~a:[H.a_id js_div_id] [];
+  H.noscript [H.pcdata "Sorry, you need to enable JavaScript to see this page."]
+]
 
 let page =
   H.html
@@ -18,12 +22,7 @@ let page =
                H.a_defer ();
                H.a_src "gaxel.js"];
        ])
-    (H.body [
-        content;
-        H.div ~a:[H.a_id js_div_id] [];
-        H.noscript [H.pcdata "Sorry, you need to enable JavaScript \
-                              to see this page."]
-      ])
+    (H.body content)
 
 let () = page |> H.pp () Format.std_formatter 
 
