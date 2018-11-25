@@ -1,7 +1,7 @@
 B _build
 S src
 
-PKG gg vg lwt lwt.react
-PKG js_of_ocaml js_of_ocaml.ppx 
+PKG gg vg lwt lwt_react lwt containers js_of_ocaml-tyxml
+PKG js_of_ocaml js_of_ocaml.ppx js_of_ocaml-lwt
 PKG tyxml
 
