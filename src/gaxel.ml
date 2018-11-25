@@ -52,11 +52,9 @@ open Gg
 module H = Tyxml_js.Html
 module R = Tyxml_js.R.Html
 
-let tick_e, tick_eupd = E.create ()
-let fps = 30.
-let game_node_id = "gaxel"
-
 let sp = Printf.sprintf
+
+(*goto make files for the following modules*)
 
 module Signal = struct
 
@@ -81,7 +79,11 @@ module Style = struct
     | `Relative -> "position: relative"
 
   let background_image url = sp "background-image: url(%s)" url
-
+  let background_size = function
+    | `Cover -> "background-size: cover"
+    | `Contain -> "background-size: contain"
+    | `Auto -> "background-size: auto"
+  
   let dist = function
     | `Px px -> sp "%dpx" px
   
@@ -105,6 +107,52 @@ module JsAux = struct
   
 end
 
+type entity_html = Html_types.body_content H.elt (*possibly reactive*)
+
+module Game = struct
+
+  module Event = struct
+
+    type t = [ `WingFlap ]
+
+    let (sink : t E.t), sink_upd = E.create ()
+    
+  end
+
+  module Entity = struct
+
+    module T = struct 
+    
+      type typ = [
+        | `Bird
+        | `Wall
+        | `Background
+      ]
+
+      type t = {
+        typ : typ;
+        width : int;
+        height : int;
+        pos_x : int;
+        pos_y : int;
+      }
+
+    end
+
+    include T
+    
+  end
+
+end
+
+open Game.Entity.T
+
+(*goto make main module of this>*)
+
+let tick_e, tick_eupd = E.create ()
+let fps = 30.
+let game_node_id = "gaxel"
+
 let feed_frp ()=
   let rec loop frame =
     tick_eupd frame;
@@ -127,46 +175,83 @@ let circle_pos_s : (float * float) S.t =
       > or better yet; define some function from 'entity' to 'component' 
         @brian; what to have in common between entities, and what to define as 
         sumtypes for different rendering?
+      > advantage of returning at same point is that we can also return the 
+        new signals/events hooked up in component
 *)
 
 let circle_01_s =
-  let style_s =
-    circle_pos_s
-    |> S.map (fun (pos_x, pos_y) ->
-        Style.make [
-          Style.position `Fixed;
-          Style.background_image
-            "https://beautifulcoolwallpapers.files.wordpress.com/\
-             2011/09/the-best-top-desktop-horse-wallpapers-21.jpg";
-          Style.width @@ `Px 1000;
-          Style.heigth @@ `Px 1000;
-          Style.left @@ `Px (truncate (pos_x *. 100.));
-          Style.top @@ `Px (truncate (pos_y *. 100.));
-        ]
-      )
-  in
-  H.div ~a:[ R.a_style style_s ] []
+  circle_pos_s
+  |> S.map (fun (pos_x, pos_y) -> {
+        typ = `Bird;
+        width = 200;
+        height = 200;
+        pos_x = truncate (pos_x *. 100.);
+        pos_y = truncate (pos_y *. 100.);
+      }
+    )
+
+(**Update*)
+(*goto define update as: 'frame -> event -> model -> model'*)
 
 (*goto make this list dynamic, based on 'alive/dead'*)
-let components_s : Html_types.body_content H.elt list S.t =
+let game_entities_s = 
   S.const [ 
     circle_01_s 
   ]
 
-let _render =
+(**View*)
+let components_s : Html_types.body_content H.elt list S.t =
+  game_entities_s
+  |> S.map (fun entities_s ->
+      entities_s
+      |> List.map (fun entity_s ->
+          let style_s =
+            entity_s |> S.map (fun entity -> 
+                match entity.typ with
+                | `Bird -> 
+                  Style.make [
+                    Style.position `Fixed;
+                    Style.background_image
+                      "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif";
+                    Style.background_size `Cover;
+                    Style.width @@ `Px entity.width;
+                    Style.heigth @@ `Px entity.height;
+                    Style.left @@ `Px entity.pos_x;
+                    Style.top @@ `Px entity.pos_y;
+                  ]
+                | `Wall -> failwith "todo"
+                | `Background -> failwith "todo"
+              )
+          in
+          H.div ~a:[
+            R.a_style style_s;
+          ] []
+        )
+    )
+
+let render () =
   let root = Dom_html.getElementById game_node_id in
   let reactive_child =
     components_s
     |> RList.from_signal
-    |> R.div ~a:[] 
+    |> R.div 
     |> Tyxml_js.To_dom.of_node
   in
-  root##appendChild reactive_child
+  Dom.appendChild root reactive_child;
+  Dom_html.document##.onkeydown := Dom_html.handler (fun e ->
+      Printf.printf "keycode: %d\n" e##.keyCode;
+      let _ = match e##.keyCode with
+        | 32 -> Game.Event.sink_upd `WingFlap
+        | _ -> ()
+      in
+      Js._false
+    )
 
 let main () =
   Dom_html.window##.onload := Dom_html.handler (fun _ -> 
       (* tick_eupd 0; (\*for debug*\) *)
       feed_frp ();
+      render ();
       Js._false
     )
 
