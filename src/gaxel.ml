@@ -56,6 +56,8 @@ let tick_e, tick_eupd = E.create ()
 let fps = 30.
 let game_node_id = "gaxel"
 
+let sp = Printf.sprintf
+
 module Signal = struct
 
   module Infix = struct 
@@ -67,6 +69,32 @@ module Signal = struct
     
 end
 
+module Style = struct
+
+  type t = string
+  
+  let make l = String.concat "; " l
+
+  let position = function
+    | `Fixed -> "position: fixed"
+    | `Absolute -> "position: absolute"
+    | `Relative -> "position: relative"
+
+  let background_image url = sp "background-image: url(%s)" url
+
+  let dist = function
+    | `Px px -> sp "%dpx" px
+  
+  let width d = sp "width: %s" (dist d)
+  let heigth d = sp "height: %s" (dist d)
+
+  let left d = sp "left: %s" (dist d)
+  let top d = sp "top: %s" (dist d)
+  let bottom d = sp "bottom: %s" (dist d)
+  let right d = sp "right: %s" (dist d)
+  
+end
+
 module JsAux = struct
 
   let rec remove_children node =
@@ -76,8 +104,6 @@ module JsAux = struct
       )
   
 end
-
-let sp = Printf.sprintf
 
 let feed_frp ()=
   let rec loop frame =
@@ -107,15 +133,15 @@ let circle_01_s =
   let style_s =
     circle_pos_s
     |> S.map (fun (pos_x, pos_y) ->
-        String.concat "" [
-          "position: fixed;";
-          sp "background-image: url(%s);"
+        Style.make [
+          Style.position `Fixed;
+          Style.background_image
             "https://beautifulcoolwallpapers.files.wordpress.com/\
              2011/09/the-best-top-desktop-horse-wallpapers-21.jpg";
-          sp "width: %dpx;" 1000;
-          sp "height: %dpx;" 1000;
-          sp "left: %dpx;" (truncate (pos_x *. 100.));
-          sp "top: %dpx;" (truncate (pos_y *. 100.));
+          Style.width @@ `Px 1000;
+          Style.heigth @@ `Px 1000;
+          Style.left @@ `Px (truncate (pos_x *. 100.));
+          Style.top @@ `Px (truncate (pos_y *. 100.));
         ]
       )
   in
