@@ -1,7 +1,7 @@
-B _build
+B _build/src
 S src
 
-PKG gg vg lwt lwt_react lwt containers js_of_ocaml-tyxml reactiveData
+PKG gg vg lwt lwt_react lwt containers js_of_ocaml-tyxml reactiveData 
 PKG js_of_ocaml js_of_ocaml.ppx js_of_ocaml-lwt
 PKG tyxml
 
