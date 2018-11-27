@@ -6,7 +6,7 @@ open Gg
 module H = Tyxml_js.Html
 module R = Tyxml_js.R.Html
 
-let debug = true
+let debug = false
 let fps = 30.
 let game_node_id = "gaxel"
 let view_w, view_h = 1920, 1080
@@ -29,7 +29,7 @@ module Game = struct
         | `Frame _ -> ()
       )
     
-    let feed_frp ()=
+    let feed_frp () =
       let rec loop frame =
         sink_eupd (`Frame frame);
         Lwt_js.sleep (1. /. fps) >>= fun () ->
