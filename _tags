@@ -1,5 +1,6 @@
 true: include
 
+true: package(ppx_deriving.std)
 true: package(gg, vg, containers, js_of_ocaml-tyxml, reactiveData)
 true: package(lwt, lwt_react)
 true: package(js_of_ocaml, js_of_ocaml-ppx, js_of_ocaml-lwt)

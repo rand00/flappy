@@ -1,6 +1,7 @@
 B _build/src
 S src
 
+PKG ppx_deriving.std
 PKG gg vg lwt lwt_react lwt containers js_of_ocaml-tyxml reactiveData 
 PKG js_of_ocaml js_of_ocaml.ppx js_of_ocaml-lwt
 PKG tyxml
