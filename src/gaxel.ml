@@ -5,7 +5,7 @@ open Gg
 module H = Tyxml_js.Html
 module R = Tyxml_js.R.Html
 
-let debug = true
+let debug = false
 let fps = 30.
 let game_node_id = "gaxel"
 
@@ -72,8 +72,8 @@ module Game = struct
         (float view_h /. 2.);
       {
         typ = `Bird;
-        width = 200;
-        height = 200;
+        width = 80;
+        height = 80;
         pos_x = float view_w /. 4. |> truncate;
         pos_y = float view_h /. 2. |> truncate;
         collided = false;
@@ -245,14 +245,23 @@ let game_entities_s : Game.Entity.T.t React.signal list React.signal =
 
 (**View*)
 
-let style_of_entity ?rotate entity image = Style.make ([
+let style_of_entity ?rotate ?extend entity image =
+  let ext = CCOpt.get_or ~default:0 extend in
+  let width, height =
+    entity.width + ext * 2,
+    entity.height + ext * 2
+  and pos_x, pos_y =
+    entity.pos_x - ext,
+    entity.pos_y - ext
+  in
+  Style.make ([
     Style.position `Fixed;
     Style.background_image image;
     Style.background_size `Cover;
-    Style.width @@ `Px entity.width;
-    Style.heigth @@ `Px entity.height;
-    Style.left @@ `Px entity.pos_x;
-    Style.top @@ `Px entity.pos_y;
+    Style.width @@ `Px width;
+    Style.heigth @@ `Px height;
+    Style.left @@ `Px pos_x;
+    Style.top @@ `Px pos_y;
   ]
   @ (rotate |> CCOpt.map Style.rotate |> CCOpt.to_list)
   @ (if not debug then [] else [
@@ -272,12 +281,15 @@ let reactive_view : Dom.node Js.t =
             entity_s |> S.map (fun entity -> 
                 match entity.typ with
                 | `Bird ->
+                  let extend = 35 in
                   if entity.collided then
                     style_of_entity entity
+                      ~extend
                       ~rotate:(`Deg 90)
                       "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
                   else 
-                    style_of_entity entity 
+                    style_of_entity entity
+                      ~extend
                       "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
                 | `Wall ->
                   style_of_entity entity 
