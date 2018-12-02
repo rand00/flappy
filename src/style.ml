@@ -11,6 +11,7 @@ let position = function
   | `Relative -> "position: relative"
 
 let background_image url = sp "background-image: url(%s)" url
+let background_color color = sp "background-color: %s" color
 let background_size = function
   | `Cover -> "background-size: cover"
   | `Contain -> "background-size: contain"
@@ -26,3 +27,6 @@ let left d = sp "left: %s" (dist d)
 let top d = sp "top: %s" (dist d)
 let bottom d = sp "bottom: %s" (dist d)
 let right d = sp "right: %s" (dist d)
+
+let rotate = function
+  | `Deg deg -> sp "transform: rotate(%ddeg)" deg
