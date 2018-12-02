@@ -74,7 +74,7 @@ module Game = struct
         typ = `Bird;
         width = 80;
         height = 80;
-        pos_x = (float view_w /. 4.) |> truncate;
+        pos_x = (float view_w /. 3.) |> truncate;
         pos_y = (float view_h /. 2.) |> truncate;
         collided = false;
       }
@@ -234,7 +234,7 @@ let game_entities_s : Game.Entity.T.t React.signal list React.signal =
       { bird; walls; background }
   in
   Game.Event.sink_e
-  |> E.fold update (Game.Model.init (0, 0))
+  |> E.fold update (Game.Model.init (1920, 1080))
   |> E.map (fun model ->
     [ model.background ]
     @ model.walls
