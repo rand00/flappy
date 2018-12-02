@@ -74,8 +74,8 @@ module Game = struct
         typ = `Bird;
         width = 80;
         height = 80;
-        pos_x = float view_w /. 4. |> truncate;
-        pos_y = float view_h /. 2. |> truncate;
+        pos_x = (float view_w /. 4.) |> truncate;
+        pos_y = (float view_h /. 2.) |> truncate;
         collided = false;
       }
 
@@ -118,7 +118,7 @@ module Game = struct
 
     let reposition (prev_w, prev_h) (w, h) e =
       let prev_x, prev_y = float e.pos_x, float e.pos_y in
-      let prev_w, prev_h = min 1. (float prev_w), min 1. (float prev_h) in
+      let prev_w, prev_h = max 1. (float prev_w), max 1. (float prev_h) in
       let w, h = float w, float h in
       let x = (prev_x /. prev_w) *. w |> truncate 
       and y = (prev_y /. prev_h) *. h |> truncate in
@@ -350,8 +350,8 @@ let main () =
   Dom_html.window##.onload := Dom_html.handler (fun _ -> 
     Random.self_init ();
     (* Game.Event.sink_eupd (`Frame 0); (\*for debug*\) *)
-    Game.Event.feed_frp ();
     render ();
+    Game.Event.feed_frp ();
     Js._false
   )
 
