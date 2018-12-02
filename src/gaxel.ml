@@ -9,11 +9,27 @@ let debug = false
 let fps = 30.
 let game_node_id = "gaxel"
 
-(* type entity_html = Html_types.body_content H.elt (\*possibly reactive*\) *)
+(*goto major meta-todo;
+  . make this code into a set of small libraries for web + web-games 
+    . make these installable in opam locally 
+*)
+
+(*goto game todo
+  . make some way of scoring 
+    . idea; have randomly generated things one can pick up 
+  . make it more fun to move around 
+    . idea; move left/right too?
+    . idea; more interesting physics
+      . idea; bouncing on walls instead of dying
+  . solve the homing-missile problem in this frp game
+    . idea; spawn homing missiles that one should avoid + make smash into walls
+*)
 
 let sp = Printf.sprintf
 let log = Printf.printf 
 let (%) f g x = f (g x)
+
+(* type entity_html = Html_types.body_content H.elt (\*possibly reactive*\) *)
 
 module Game = struct
 
@@ -277,7 +293,9 @@ let style_of_entity ?rotate ?extend entity image =
 )
 
 (*>old type: Html_types.body_content H.elt list S.t*)
-(*> goto make this into a 'elm' library function*)
+(*> goto make this into a 'elm' library function
+  . think first if this should have some other interface (e.g. taking reactive html instead!)
+*)
 let reactive_view : Dom.node Js.t =
   game_entities_s
   |> S.map (fun entities_s ->
@@ -298,10 +316,11 @@ let reactive_view : Dom.node Js.t =
                       ~extend
                       "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
                 | `Wall ->
-                  style_of_entity entity 
-                    "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2F\
-                     www.hdwallback.net%2Fwp-content%2Fuploads%2F2017%2F12%2F\
-                     brick-wallpapers-images.jpg&f=1"
+                  style_of_entity entity
+                    "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fs14.favim.com%2Forig%2F160524%2Fbts-fire-gif-suga-Favim.com-4339714.gif&f=1"
+                    (* "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2F\
+                     *  www.hdwallback.net%2Fwp-content%2Fuploads%2F2017%2F12%2F\
+                     *  brick-wallpapers-images.jpg&f=1" *)
                 | `Background ->
                   style_of_entity entity 
                     "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fhdwpro.com\
@@ -343,12 +362,12 @@ let render () =
       | 32 -> Game.Event.sink_eupd `WingFlap
       | _ -> ()
     in
-    Js._false
+    Js._true
   );
   update_view_size () |> ignore;
   Dom_html.window##.onresize := Dom_html.handler (fun _ ->
     update_view_size () |> ignore;
-    Js._false
+    Js._true
   )
 
 
