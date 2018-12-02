@@ -66,15 +66,14 @@ module Game = struct
     include T
     
     let init_bird (view_w, view_h) =
-      (*goto remove*)
       log "init-bird: float view_w /. 4. = %f, float view_h /. 2. = %f\n"
         (float view_w /. 4.)
         (float view_h /. 2.);
       {
         typ = `Bird;
-        width = 80;
-        height = 80;
-        pos_x = (float view_w /. 3.) |> truncate;
+        width = 30;
+        height = 30;
+        pos_x = (float view_w /. 4.) |> truncate;
         pos_y = (float view_h /. 2.) |> truncate;
         collided = false;
       }
@@ -89,9 +88,13 @@ module Game = struct
     }
 
     let init_wall frame (view_w, view_h) =
-      let width = Random.int 40 + 20 in
+      let width = Random.int 150 + 50 in
       let height = Random.int (max 1 (view_h / 3)) + (view_h / 2) in
-      if (frame mod truncate fps * 1 = 0) && Random.float 1.0 < 0.3 then 
+      let dist_mul = 4. in
+      if
+        frame mod truncate (fps *. dist_mul) = 0
+        && Random.float 1.0 < (0.2 *. dist_mul)
+      then 
         let wall = {
           typ = `Wall;
           width;
@@ -147,15 +150,18 @@ module Game = struct
     let collides es e =
       let range_x e = e.pos_x, e.pos_x + e.width in
       let range_y e = e.pos_y, e.pos_y + e.height in
+      (*note - this is a point <-> range relation*)
       let is_contained_1d i (start, stop) =
         start <= i && i <= stop
       in
+      (*note - this is a range <-> range relation*)
       let is_collision_1d ((start,stop) as r) ((start',stop') as r') =
         is_contained_1d start  r' ||
         is_contained_1d stop   r' ||
         is_contained_1d start' r  ||
         is_contained_1d stop'  r 
       in
+      (*note - this is a 2d-range <-> 2d-range relation*)
       let is_collision_2d e' =
         is_collision_1d (range_x e) (range_x e') &&
         is_collision_1d (range_y e) (range_y e')
@@ -218,7 +224,7 @@ let game_entities_s : Game.Entity.T.t React.signal list React.signal =
         |> List.append (Game.Entity.init_wall frame dimensions) in
       let bird =
         model.bird
-        |> Game.Entity.move_y 10
+        |> Game.Entity.move_y 11
         |> Game.Entity.mark_if_collision walls
       in
       { model with bird; walls }
@@ -281,7 +287,7 @@ let reactive_view : Dom.node Js.t =
             entity_s |> S.map (fun entity -> 
                 match entity.typ with
                 | `Bird ->
-                  let extend = 35 in
+                  let extend = 100 in
                   if entity.collided then
                     style_of_entity entity
                       ~extend
