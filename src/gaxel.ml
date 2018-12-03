@@ -220,7 +220,7 @@ open Game.Model.T
 
 (**Update*)
 
-let game_state_s : Game.Model.t option React.signal = 
+let game_model_s : Game.Model.t option React.signal = 
   let update model event =
     match event with
     | `WingFlap ->
@@ -293,19 +293,14 @@ let style_of_entity
   . think first if this should have some other interface (e.g. taking reactive html instead!)
 *)
 let reactive_view : Dom.node Js.t =
-  game_state_s
-  |> S.map (fun model_opt ->
-      model_opt 
-      |> CCOpt.map (fun model ->
+  game_model_s |> S.map (fun model_opt ->
+      model_opt
+      |> CCOpt.to_list
+      |> CCList.flat_map (fun model ->
           model.background :: model.walls @ [ model.bird ]
         )
-      |> CCOpt.to_list
-    )
-  |> S.map (fun entities_s ->
-      entities_s
       |> List.map (fun entity ->
-          let reactive_element =
-            (* entity_s |> S.map (fun entity ->  *)
+          let element =
             let style =
               match entity.typ with
               | `Bird ->
@@ -335,19 +330,16 @@ let reactive_view : Dom.node Js.t =
             in
             let div = H.div ~a:[ H.a_style style ] [] in
             entity, div
-            (* ) *)
           in
-          let debug_text = R.pcdata begin entity_s |> S.map (fun entity ->
+          let debug_text = H.pcdata (
               match entity.typ with
               | `Bird -> "bird"
               | `Wall -> "wall"
               | `Background -> "background"
             )
-            end
           in
-          R.div (
-            reactive_element
-            |> S.map (fun (entity, entity_div) ->
+          H.div (
+            element |> (fun (entity, entity_div) ->
                 let debug_div =
                   if debug then (
                     let background_color = "red" in
@@ -364,7 +356,6 @@ let reactive_view : Dom.node Js.t =
                   entity_div;
                 ]
               )
-            |> RList.from_signal;
           )
         )
     )
