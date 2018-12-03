@@ -32,3 +32,13 @@ let rotate = function
   | `Deg deg -> sp "transform: rotate(%ddeg)" deg
 
 let z_index i = sp "z-index: %d" i
+
+let font_family = function
+  | `Courier_new -> sp "font-family: \"Courier New\", monospace"
+
+let font_size d = sp "font-size: %s" (dist d)
+
+let text_shadow d0 d1 d2 color =
+  sp "text-shadow: %s %s %s %s" (dist d0) (dist d1) (dist d2) color
+
+let color color = sp "color: %s" color 

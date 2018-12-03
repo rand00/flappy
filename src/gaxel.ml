@@ -5,7 +5,7 @@ open Gg
 module H = Tyxml_js.Html
 module R = Tyxml_js.R.Html
 
-let debug = false
+let debug = true
 let fps = 30.
 let game_node_id = "gaxel"
 
@@ -61,6 +61,7 @@ module Game = struct
         | `Bird
         | `Wall
         | `Background
+        | `Scoreboard of int
       ][@@deriving show]
 
       type t = {
@@ -117,6 +118,15 @@ module Game = struct
         [ wall ]
       else
         []
+
+    let init_scoreboard (view_w, view_h) = {
+      typ = `Scoreboard 0;
+      width = 0;
+      height = 0;
+      pos_x = view_w - 150;
+      pos_y = view_h - 80;
+      collided = false;
+    }
     
     let move_x px e = {
       e with pos_x = e.pos_x + px
@@ -194,6 +204,7 @@ module Game = struct
         bird : Entity.t;
         walls : Entity.t list;
         background : Entity.t;
+        scoreboard : Entity.t;
       }[@@deriving show]
 
     end
@@ -204,6 +215,7 @@ module Game = struct
       bird = Entity.init_bird view_dimensions;
       walls = [];
       background = Entity.init_background view_dimensions;
+      scoreboard = Entity.init_scoreboard view_dimensions;
     }
     
   end
@@ -246,9 +258,10 @@ let game_model_s : Game.Model.t option React.signal =
       in
       let bird = model.bird |> reposition in
       let walls = model.walls |> List.map reposition in
-      let background = model.background |> Game.Entity.resize dimensions
+      let scoreboard = model.scoreboard |> reposition in
+      let background = model.background |> Game.Entity.resize dimensions 
       in
-      { bird; walls; background }
+      { bird; walls; background; scoreboard }
   in
   Game.Event.sink_e
   |> E.fold update (Game.Model.init (1920, 1080))
@@ -258,7 +271,7 @@ let game_model_s : Game.Model.t option React.signal =
 (**View*)
 
 let style_of_entity
-    ?rotate ?extend ?background_color ?z_index
+    ?rotate ?extend ?background_color ?z_index 
     entity image
   =
   let ext = CCOpt.get_or ~default:0 extend in
@@ -277,6 +290,10 @@ let style_of_entity
     Style.heigth @@ `Px height;
     Style.left @@ `Px pos_x;
     Style.top @@ `Px pos_y;
+    Style.font_family `Courier_new;
+    Style.font_size @@ `Px 80;
+    (let px = `Px 2 in Style.text_shadow px px px "rgb(52, 0, 85)");
+    Style.color "rgb(52, 0, 85)";
   ]
     @ (rotate |> CCOpt.map Style.rotate |> CCOpt.to_list)
     @ (background_color |> CCOpt.map Style.background_color |> CCOpt.to_list)
@@ -289,39 +306,49 @@ let style_of_entity
 *)
 let reactive_view : Dom.node Js.t =
   let model_to_list model =
-    model.background :: model.walls @ [ model.bird ]
+    model.background :: model.walls @ [ model.bird ] @ [ model.scoreboard ] 
   in
   let render_game_entity entity =
-    let entity_style = begin match entity.typ with
+    begin match entity.typ with
       | `Bird ->
         begin
           let extend = 100 in
-          if entity.collided then
-            style_of_entity entity
-              ~extend
-              ~rotate:(`Deg 90)
-              "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
-          else 
-            style_of_entity entity
-              ~extend
-              "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
+          let style = 
+            if entity.collided then
+              style_of_entity entity
+                ~extend
+                ~rotate:(`Deg 90)
+                "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
+            else 
+              style_of_entity entity
+                ~extend
+                "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
+          in
+          H.div ~a:[ H.a_style style ] []
         end
       | `Wall ->
-        style_of_entity entity
-          "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fs14.favim.\
-           com%2Forig%2F160524%2Fbts-fire-gif-suga-Favim.com-4339714.\
-           gif&f=1"
+        let style = style_of_entity entity
+            "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fs14.favim.\
+             com%2Forig%2F160524%2Fbts-fire-gif-suga-Favim.com-4339714.\
+             gif&f=1"
+        in
+        H.div ~a:[ H.a_style style ] []
       (* "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2F\
        *  www.hdwallback.net%2Fwp-content%2Fuploads%2F2017%2F12%2F\
        *  brick-wallpapers-images.jpg&f=1" *)
       | `Background ->
-        style_of_entity entity 
-          "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fhdwpro.com\
-           %2Fwp-content%2Fuploads%2F2016%2F03%2FNature-Amazing-\
-           Picture.jpeg&f=1"
+        let style = style_of_entity entity 
+            "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fhdwpro.com\
+             %2Fwp-content%2Fuploads%2F2016%2F03%2FNature-Amazing-\
+             Picture.jpeg&f=1"
+        in
+        H.div ~a:[ H.a_style style ] []
+      | `Scoreboard score ->
+        let style = style_of_entity entity ""
+        in
+        let content = H.pcdata (sp "%d" score) in
+        H.div ~a:[ H.a_style style ] [ content ]
     end
-    in
-    H.div ~a:[ H.a_style entity_style ] []          
   in
   let render_debug_overlay entity =
     if not debug then H.div [] else (
@@ -330,10 +357,11 @@ let reactive_view : Dom.node Js.t =
           | `Bird -> "bird"
           | `Wall -> "wall"
           | `Background -> "background"
+          | `Scoreboard _ -> "scoreboard"
         )
       in
       let background_color = "red" in
-      let z_index = if entity.typ = `Bird then 10 else 0 in
+      let z_index = if entity.typ = `Bird then 10 else -1 in
       let debug_style = style_of_entity ~z_index ~background_color entity "" in
       H.div ~a:[ H.a_style debug_style ] [ debug_text ]
     )
