@@ -9,11 +9,6 @@ let debug = false
 let fps = 30.
 let game_node_id = "gaxel"
 
-(*goto major meta-todo;
-  . make this code into a set of small libraries for web + web-games 
-    . make these installable in opam locally 
-*)
-
 (*goto game todo
   . make some way of scoring 
     . idea; have randomly generated things one can pick up 
@@ -293,71 +288,67 @@ let style_of_entity
   . think first if this should have some other interface (e.g. taking reactive html instead!)
 *)
 let reactive_view : Dom.node Js.t =
+  let model_to_list model =
+    model.background :: model.walls @ [ model.bird ]
+  in
+  let render_game_entity entity =
+    let entity_style = begin match entity.typ with
+      | `Bird ->
+        begin
+          let extend = 100 in
+          if entity.collided then
+            style_of_entity entity
+              ~extend
+              ~rotate:(`Deg 90)
+              "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
+          else 
+            style_of_entity entity
+              ~extend
+              "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
+        end
+      | `Wall ->
+        style_of_entity entity
+          "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fs14.favim.\
+           com%2Forig%2F160524%2Fbts-fire-gif-suga-Favim.com-4339714.\
+           gif&f=1"
+      (* "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2F\
+       *  www.hdwallback.net%2Fwp-content%2Fuploads%2F2017%2F12%2F\
+       *  brick-wallpapers-images.jpg&f=1" *)
+      | `Background ->
+        style_of_entity entity 
+          "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fhdwpro.com\
+           %2Fwp-content%2Fuploads%2F2016%2F03%2FNature-Amazing-\
+           Picture.jpeg&f=1"
+    end
+    in
+    H.div ~a:[ H.a_style entity_style ] []          
+  in
+  let render_debug_overlay entity =
+    if not debug then H.div [] else (
+      let debug_text = H.pcdata (
+          match entity.typ with
+          | `Bird -> "bird"
+          | `Wall -> "wall"
+          | `Background -> "background"
+        )
+      in
+      let background_color = "red" in
+      let z_index = if entity.typ = `Bird then 10 else 0 in
+      let debug_style = style_of_entity ~z_index ~background_color entity "" in
+      H.div ~a:[ H.a_style debug_style ] [ debug_text ]
+    )
+  in
+  let render_full_entity entity =
+    H.div [
+      render_game_entity entity;
+      render_debug_overlay entity;
+    ]
+  in
   game_model_s |> S.map (fun model_opt ->
       model_opt
       |> CCOpt.to_list
-      |> CCList.flat_map (fun model ->
-          model.background :: model.walls @ [ model.bird ]
-        )
-      |> List.map (fun entity ->
-          let element =
-            let style =
-              match entity.typ with
-              | `Bird ->
-                let extend = 100 in
-                if entity.collided then
-                  style_of_entity entity
-                    ~extend
-                    ~rotate:(`Deg 90)
-                    "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
-                else 
-                  style_of_entity entity
-                    ~extend
-                    "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
-              | `Wall ->
-                style_of_entity entity
-                  "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fs14.favim.\
-                   com%2Forig%2F160524%2Fbts-fire-gif-suga-Favim.com-4339714.\
-                   gif&f=1"
-              (* "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2F\
-               *  www.hdwallback.net%2Fwp-content%2Fuploads%2F2017%2F12%2F\
-               *  brick-wallpapers-images.jpg&f=1" *)
-              | `Background ->
-                style_of_entity entity 
-                  "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fhdwpro.com\
-                   %2Fwp-content%2Fuploads%2F2016%2F03%2FNature-Amazing-\
-                   Picture.jpeg&f=1"
-            in
-            let div = H.div ~a:[ H.a_style style ] [] in
-            entity, div
-          in
-          let debug_text = H.pcdata (
-              match entity.typ with
-              | `Bird -> "bird"
-              | `Wall -> "wall"
-              | `Background -> "background"
-            )
-          in
-          H.div (
-            element |> (fun (entity, entity_div) ->
-                let debug_div =
-                  if debug then (
-                    let background_color = "red" in
-                    let z_index = if entity.typ = `Bird then 10 else 0 in
-                    let debug_style =
-                      style_of_entity
-                        ~z_index
-                        ~background_color entity "" in
-                    H.div ~a:[ H.a_style debug_style ] [ debug_text ]
-                  ) else H.div []
-                in
-                [
-                  debug_div;
-                  entity_div;
-                ]
-              )
-          )
-        )
+      |> CCList.flat_map model_to_list
+      |> List.map render_full_entity
     )
   |> RList.from_signal
   |> R.div 
