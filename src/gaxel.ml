@@ -62,6 +62,7 @@ module Game = struct
         | `Wall
         | `Background
         | `Scoreboard of int
+        | `Cookie
       ][@@deriving show]
 
       type t = {
@@ -119,6 +120,24 @@ module Game = struct
       else
         []
 
+    let init_cookie frame (view_w, view_h) =
+      let dist_mul = 4. in
+      let width = 25 in
+      let time_to_spawn =
+        frame mod truncate (fps *. dist_mul) = 0
+        && Random.float 1.0 < (0.2 *. dist_mul)
+      in
+      if not time_to_spawn then [] else [
+        {
+          typ = `Cookie;
+          width;
+          height = width;
+          pos_x = view_w + width;
+          pos_y = Random.float 1. *. float view_h |> truncate;
+          collided = false;
+        }
+      ]
+    
     let init_scoreboard (view_w, view_h) = {
       typ = `Scoreboard 0;
       width = 0;
@@ -151,23 +170,11 @@ module Game = struct
     (*Note: e is out of bounds if whole e-area is out of bounds*)
     let is_out_of_bounds (w, h) e =
       let eps = 0 in
-      let b = 
-        e.pos_x + e.width < 0 - eps ||
-        e.pos_y + e.height < 0 - eps ||
-        e.pos_x > w + eps ||
-        e.pos_y > w + eps
-      in
-      (* log "e.pos_x + e.width < 0 - eps = %b\n" (e.pos_x + e.width < 0 - eps);
-       * log "e.pos_y + e.height < 0 - eps = %b\n" (e.pos_y + e.height < 0 - eps); 
-       * log "e.pos_x > w + eps = %b\n" (e.pos_x > w + eps);
-       * log "e.pos_y > w + eps = %b\n" (e.pos_y > w + eps);
-       * log "is out of bounds. x = %d, y = %d, w = %d, h = %d, \
-       *      view_w = %d, view_h = %d\n"
-       *   e.pos_x e.pos_y
-       *   e.width e.height
-       *   w h; *)
-      b
-
+      e.pos_x + e.width < 0 - eps ||
+      e.pos_y + e.height < 0 - eps ||
+      e.pos_x > w + eps ||
+      e.pos_y > w + eps
+    
     let collides es e =
       let range_x e = e.pos_x, e.pos_x + e.width in
       let range_y e = e.pos_y, e.pos_y + e.height in
@@ -203,6 +210,7 @@ module Game = struct
       type t = {
         bird : Entity.t;
         walls : Entity.t list;
+        cookies : Entity.t list;
         background : Entity.t;
         scoreboard : Entity.t;
       }[@@deriving show]
@@ -214,6 +222,7 @@ module Game = struct
     let init view_dimensions = {
       bird = Entity.init_bird view_dimensions;
       walls = [];
+      cookies = [];
       background = Entity.init_background view_dimensions;
       scoreboard = Entity.init_scoreboard view_dimensions;
     }
@@ -248,9 +257,13 @@ let game_model_s : Game.Model.t option React.signal =
       let bird =
         model.bird
         |> Game.Entity.move_y 11
-        |> Game.Entity.mark_if_collision walls
+        |> Game.Entity.mark_if_collision walls in
+      let cookies =
+        model.cookies
+        |> List.map (Game.Entity.move_x (-6))
+        |> List.append (Game.Entity.init_cookie frame dimensions)
       in
-      { model with bird; walls }
+      { model with bird; walls; cookies }
     | `ViewResize dimensions ->
       let prev_dimensions = (model.background.width, model.background.height) in
       let reposition e =
@@ -258,10 +271,11 @@ let game_model_s : Game.Model.t option React.signal =
       in
       let bird = model.bird |> reposition in
       let walls = model.walls |> List.map reposition in
+      let cookies = model.cookies |> List.map reposition in
       let scoreboard = model.scoreboard |> reposition in
       let background = model.background |> Game.Entity.resize dimensions 
       in
-      { bird; walls; background; scoreboard }
+      { bird; walls; background; scoreboard; cookies }
   in
   Game.Event.sink_e
   |> E.fold update (Game.Model.init (1920, 1080))
@@ -326,6 +340,13 @@ let reactive_view : Dom.node Js.t =
           in
           H.div ~a:[ H.a_style style ] []
         end
+      | `Cookie ->
+        let style = style_of_entity entity
+            "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fs14.favim.\
+             com%2Forig%2F160524%2Fbts-fire-gif-suga-Favim.com-4339714.\
+             gif&f=1"
+        in
+        H.div ~a:[ H.a_style style ] []
       | `Wall ->
         let style = style_of_entity entity
             "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fs14.favim.\
@@ -358,12 +379,18 @@ let reactive_view : Dom.node Js.t =
           | `Wall -> "wall"
           | `Background -> "background"
           | `Scoreboard _ -> "scoreboard"
+          | `Cookie -> "cookie"
         )
       in
       let background_color = "red" in
-      let z_index = if entity.typ = `Bird then 10 else -1 in
-      let debug_style = style_of_entity ~z_index ~background_color entity "" in
-      H.div ~a:[ H.a_style debug_style ] [ debug_text ]
+      let z_index = if entity.typ = `Bird then 1 else -1 in
+      let debug_style = style_of_entity ~background_color ~z_index entity "" in
+      let debug_style_text = style_of_entity ~z_index:2 entity "" in
+      H.div ~a:[ H.a_style debug_style ] [
+        H.div ~a:[ H.a_style debug_style_text ] [
+          debug_text
+        ]
+      ]
     )
   in
   let render_full_entity entity =
