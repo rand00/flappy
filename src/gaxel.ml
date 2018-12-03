@@ -5,7 +5,7 @@ open Gg
 module H = Tyxml_js.Html
 module R = Tyxml_js.R.Html
 
-let debug = true
+let debug = false
 let fps = 30.
 let game_node_id = "gaxel"
 
@@ -220,7 +220,7 @@ open Game.Model.T
 
 (**Update*)
 
-let game_entities_s : Game.Entity.T.t React.signal list React.signal = 
+let game_state_s : Game.Model.t option React.signal = 
   let update model event =
     match event with
     | `WingFlap ->
@@ -257,13 +257,8 @@ let game_entities_s : Game.Entity.T.t React.signal list React.signal =
   in
   Game.Event.sink_e
   |> E.fold update (Game.Model.init (1920, 1080))
-  |> E.map (fun model ->
-    [ model.background ]
-    @ model.walls
-    @ [ model.bird ]
-    |> List.map S.const (*goto, here we just fill the signature..*)
-  )
-  |> S.hold []
+  |> E.map CCOpt.pure
+  |> S.hold None
 
 (**View*)
 
@@ -288,52 +283,59 @@ let style_of_entity
     Style.left @@ `Px pos_x;
     Style.top @@ `Px pos_y;
   ]
-  @ (rotate |> CCOpt.map Style.rotate |> CCOpt.to_list)
-  @ (background_color |> CCOpt.map Style.background_color |> CCOpt.to_list)
-  @ (z_index |> CCOpt.map Style.z_index |> CCOpt.to_list)
-)
+    @ (rotate |> CCOpt.map Style.rotate |> CCOpt.to_list)
+    @ (background_color |> CCOpt.map Style.background_color |> CCOpt.to_list)
+    @ (z_index |> CCOpt.map Style.z_index |> CCOpt.to_list)
+  )
 
 (*>old type: Html_types.body_content H.elt list S.t*)
 (*> goto make this into a 'elm' library function
   . think first if this should have some other interface (e.g. taking reactive html instead!)
 *)
 let reactive_view : Dom.node Js.t =
-  game_entities_s
+  game_state_s
+  |> S.map (fun model_opt ->
+      model_opt 
+      |> CCOpt.map (fun model ->
+          model.background :: model.walls @ [ model.bird ]
+        )
+      |> CCOpt.to_list
+    )
   |> S.map (fun entities_s ->
       entities_s
-      |> List.map (fun entity_s ->
+      |> List.map (fun entity ->
           let reactive_element =
-            entity_s |> S.map (fun entity -> 
-                let style =
-                  match entity.typ with
-                  | `Bird ->
-                    let extend = 100 in
-                    if entity.collided then
-                      style_of_entity entity
-                        ~extend
-                        ~rotate:(`Deg 90)
-                        "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
-                    else 
-                      style_of_entity entity
-                        ~extend
-                        "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
-                  | `Wall ->
-                    style_of_entity entity
-                      "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fs14.favim.\
-                       com%2Forig%2F160524%2Fbts-fire-gif-suga-Favim.com-4339714.\
-                       gif&f=1"
-                  (* "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2F\
-                   *  www.hdwallback.net%2Fwp-content%2Fuploads%2F2017%2F12%2F\
-                   *  brick-wallpapers-images.jpg&f=1" *)
-                  | `Background ->
-                    style_of_entity entity 
-                      "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fhdwpro.com\
-                       %2Fwp-content%2Fuploads%2F2016%2F03%2FNature-Amazing-\
-                       Picture.jpeg&f=1"
-                in
-                let div = H.div ~a:[ H.a_style style ] [] in
-                entity, div
-              )
+            (* entity_s |> S.map (fun entity ->  *)
+            let style =
+              match entity.typ with
+              | `Bird ->
+                let extend = 100 in
+                if entity.collided then
+                  style_of_entity entity
+                    ~extend
+                    ~rotate:(`Deg 90)
+                    "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
+                else 
+                  style_of_entity entity
+                    ~extend
+                    "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
+              | `Wall ->
+                style_of_entity entity
+                  "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fs14.favim.\
+                   com%2Forig%2F160524%2Fbts-fire-gif-suga-Favim.com-4339714.\
+                   gif&f=1"
+              (* "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2F\
+               *  www.hdwallback.net%2Fwp-content%2Fuploads%2F2017%2F12%2F\
+               *  brick-wallpapers-images.jpg&f=1" *)
+              | `Background ->
+                style_of_entity entity 
+                  "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fhdwpro.com\
+                   %2Fwp-content%2Fuploads%2F2016%2F03%2FNature-Amazing-\
+                   Picture.jpeg&f=1"
+            in
+            let div = H.div ~a:[ H.a_style style ] [] in
+            entity, div
+            (* ) *)
           in
           let debug_text = R.pcdata begin entity_s |> S.map (fun entity ->
               match entity.typ with
