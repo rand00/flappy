@@ -30,3 +30,5 @@ let right d = sp "right: %s" (dist d)
 
 let rotate = function
   | `Deg deg -> sp "transform: rotate(%ddeg)" deg
+
+let z_index i = sp "z-index: %d" i

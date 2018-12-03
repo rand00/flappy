@@ -5,7 +5,7 @@ open Gg
 module H = Tyxml_js.Html
 module R = Tyxml_js.R.Html
 
-let debug = false
+let debug = true
 let fps = 30.
 let game_node_id = "gaxel"
 
@@ -267,7 +267,10 @@ let game_entities_s : Game.Entity.T.t React.signal list React.signal =
 
 (**View*)
 
-let style_of_entity ?rotate ?extend entity image =
+let style_of_entity
+    ?rotate ?extend ?background_color ?z_index
+    entity image
+  =
   let ext = CCOpt.get_or ~default:0 extend in
   let width, height =
     entity.width + ext * 2,
@@ -286,10 +289,8 @@ let style_of_entity ?rotate ?extend entity image =
     Style.top @@ `Px pos_y;
   ]
   @ (rotate |> CCOpt.map Style.rotate |> CCOpt.to_list)
-  @ (if not debug then [] else [
-    Style.background_color "red"
-  ])
-      
+  @ (background_color |> CCOpt.map Style.background_color |> CCOpt.to_list)
+  @ (z_index |> CCOpt.map Style.z_index |> CCOpt.to_list)
 )
 
 (*>old type: Html_types.body_content H.elt list S.t*)
@@ -301,44 +302,67 @@ let reactive_view : Dom.node Js.t =
   |> S.map (fun entities_s ->
       entities_s
       |> List.map (fun entity_s ->
-          let style_s =
+          let reactive_element =
             entity_s |> S.map (fun entity -> 
-                match entity.typ with
-                | `Bird ->
-                  let extend = 100 in
-                  if entity.collided then
+                let style =
+                  match entity.typ with
+                  | `Bird ->
+                    let extend = 100 in
+                    if entity.collided then
+                      style_of_entity entity
+                        ~extend
+                        ~rotate:(`Deg 90)
+                        "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
+                    else 
+                      style_of_entity entity
+                        ~extend
+                        "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
+                  | `Wall ->
                     style_of_entity entity
-                      ~extend
-                      ~rotate:(`Deg 90)
-                      "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
-                  else 
-                    style_of_entity entity
-                      ~extend
-                      "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
-                | `Wall ->
-                  style_of_entity entity
-                    "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fs14.favim.com%2Forig%2F160524%2Fbts-fire-gif-suga-Favim.com-4339714.gif&f=1"
-                    (* "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2F\
-                     *  www.hdwallback.net%2Fwp-content%2Fuploads%2F2017%2F12%2F\
-                     *  brick-wallpapers-images.jpg&f=1" *)
-                | `Background ->
-                  style_of_entity entity 
-                    "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fhdwpro.com\
-                     %2Fwp-content%2Fuploads%2F2016%2F03%2FNature-Amazing-\
-                     Picture.jpeg&f=1"
+                      "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fs14.favim.\
+                       com%2Forig%2F160524%2Fbts-fire-gif-suga-Favim.com-4339714.\
+                       gif&f=1"
+                  (* "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2F\
+                   *  www.hdwallback.net%2Fwp-content%2Fuploads%2F2017%2F12%2F\
+                   *  brick-wallpapers-images.jpg&f=1" *)
+                  | `Background ->
+                    style_of_entity entity 
+                      "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fhdwpro.com\
+                       %2Fwp-content%2Fuploads%2F2016%2F03%2FNature-Amazing-\
+                       Picture.jpeg&f=1"
+                in
+                let div = H.div ~a:[ H.a_style style ] [] in
+                entity, div
               )
           in
-          H.div ~a:[ R.a_style style_s ] (
-            if debug then
-              [ R.pcdata begin entity_s |> S.map (fun entity ->
-                    match entity.typ with
-                    | `Bird -> "bird"
-                    | `Wall -> "wall"
-                    | `Background -> "background"
-                  )
-                  end
-              ]
-            else []
+          let debug_text = R.pcdata begin entity_s |> S.map (fun entity ->
+              match entity.typ with
+              | `Bird -> "bird"
+              | `Wall -> "wall"
+              | `Background -> "background"
+            )
+            end
+          in
+          R.div (
+            reactive_element
+            |> S.map (fun (entity, entity_div) ->
+                let debug_div =
+                  if debug then (
+                    let background_color = "red" in
+                    let z_index = if entity.typ = `Bird then 10 else 0 in
+                    let debug_style =
+                      style_of_entity
+                        ~z_index
+                        ~background_color entity "" in
+                    H.div ~a:[ H.a_style debug_style ] [ debug_text ]
+                  ) else H.div []
+                in
+                [
+                  debug_div;
+                  entity_div;
+                ]
+              )
+            |> RList.from_signal;
           )
         )
     )
