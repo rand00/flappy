@@ -10,9 +10,13 @@ let fps = 30.
 let game_node_id = "gaxel"
 
 (*goto game todo
-  . make some way of scoring 
-    . idea; have randomly generated things one can pick up 
+  . performance; 
+    . test performance of board with framerate but no movement
+  . make milkshakes move in some kind of pattern
+    . could this be a general entity thing? to have an animation-spec 
+      < try to avoid a function here
   . make it more fun to move around 
+    . idea; have 'holes in walls' instead of just pillars
     . idea; move left/right too?
     . idea; more interesting physics
       . idea; bouncing on walls instead of dying
@@ -78,18 +82,14 @@ module Game = struct
 
     include T
     
-    let init_bird (view_w, view_h) =
-      log "init-bird: float view_w /. 4. = %f, float view_h /. 2. = %f\n"
-        (float view_w /. 4.)
-        (float view_h /. 2.);
-      {
-        typ = `Bird;
-        width = 30;
-        height = 30;
-        pos_x = (float view_w /. 4.) |> truncate;
-        pos_y = (float view_h /. 2.) |> truncate;
-        collided = false;
-      }
+    let init_bird (view_w, view_h) = {
+      typ = `Bird;
+      width = 30;
+      height = 30;
+      pos_x = (float view_w /. 4.) |> truncate;
+      pos_y = (float view_h /. 2.) |> truncate;
+      collided = false;
+    }
 
     let init_background (view_w, view_h) = {
       typ = `Background;
@@ -101,24 +101,26 @@ module Game = struct
     }
 
     let init_wall frame (view_w, view_h) =
-      let width = Random.int 150 + 50 in
-      let height = Random.int (max 1 (view_h / 3)) + (view_h / 2) in
       let dist_mul = 4. in
-      if
+      let time_to_spawn =
         frame mod truncate (fps *. dist_mul) = 0
         && Random.float 1.0 < (0.2 *. dist_mul)
-      then 
-        let wall = {
-          typ = `Wall;
-          width;
-          height;
-          pos_x = view_w;
-          pos_y = if Random.bool () then 0 else view_h - height;
-          collided = false;
-        } in
-        [ wall ]
-      else
-        []
+      in
+      if not time_to_spawn then [] else (
+        let width = Random.int 150 + 50 in
+        let height = Random.int (max 1 (view_h / 3)) + (view_h / 2)
+        in
+        [
+          {
+            typ = `Wall;
+            width;
+            height;
+            pos_x = view_w;
+            pos_y = if Random.bool () then 0 else view_h - height;
+            collided = false;
+          }
+        ]
+      )
 
     let init_cookie frame (view_w, view_h) =
       let dist_mul = 3. in
@@ -154,7 +156,7 @@ module Game = struct
     let increment_score s' e =
       match e.typ with
       | `Scoreboard s -> { e with typ = `Scoreboard (s + s') }
-      | _ -> failwith "wrong type"
+      | _ -> failwith "this was not a scoreboard!"
 
     let move_x px e = {
       e with pos_x = e.pos_x + px
@@ -270,6 +272,9 @@ let game_model_s : Game.Model.t option React.signal =
       let scoreboard, cookies =
         let cookies =
           model.cookies
+          (*goto could map 'apply_movement' here instead, which should be saved pr. entity
+            < should also include the info about who's being followed?
+          *)
           |> List.map (Game.Entity.move_x (-10))
           |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
           |> List.append (Game.Entity.init_cookie frame dimensions) in
@@ -279,7 +284,7 @@ let game_model_s : Game.Model.t option React.signal =
         let score_round = List.(length cookies - length cookies_left) in
         let scoreboard =
           model.scoreboard
-          |> Game.Entity.increment_score score_round
+          |> Game.Entity.increment_score score_round 
         in
         scoreboard, cookies_left
       in
