@@ -5,7 +5,7 @@ open Gg
 module H = Tyxml_js.Html
 module R = Tyxml_js.R.Html
 
-let debug = true
+let debug = false
 let fps = 30.
 let game_node_id = "gaxel"
 
@@ -121,23 +121,27 @@ module Game = struct
         []
 
     let init_cookie frame (view_w, view_h) =
-      let dist_mul = 4. in
-      let width = 25 in
+      let dist_mul = 3. in
       let time_to_spawn =
         frame mod truncate (fps *. dist_mul) = 0
         && Random.float 1.0 < (0.2 *. dist_mul)
       in
-      if not time_to_spawn then [] else [
-        {
-          typ = `Cookie;
-          width;
-          height = width;
-          pos_x = view_w + width;
-          pos_y = Random.float 1. *. float view_h |> truncate;
-          collided = false;
-        }
-      ]
-    
+      if not time_to_spawn then [] else (
+        let width = 80
+        and pos_x = view_w
+        and pos_y = (Random.float 1. *. float view_h) |> truncate in
+        [
+          {
+            typ = `Cookie;
+            width;
+            height = width;
+            pos_x;
+            pos_y;
+            collided = false;
+          }
+        ]
+      )
+
     let init_scoreboard (view_w, view_h) = {
       typ = `Scoreboard 0;
       width = 0;
@@ -259,10 +263,13 @@ let game_model_s : Game.Model.t option React.signal =
         |> Game.Entity.move_y 11
         |> Game.Entity.mark_if_collision walls in
       let cookies =
+        (*goto filter on out of bounds*)
         model.cookies
         |> List.map (Game.Entity.move_x (-6))
+        (*goto fix there is no cake :( *)
         |> List.append (Game.Entity.init_cookie frame dimensions)
       in
+      (* log "cookies length = %d\n" (List.length cookies); *)
       { model with bird; walls; cookies }
     | `ViewResize dimensions ->
       let prev_dimensions = (model.background.width, model.background.height) in
@@ -319,8 +326,13 @@ let style_of_entity
   . think first if this should have some other interface (e.g. taking reactive html instead!)
 *)
 let reactive_view : Dom.node Js.t =
-  let model_to_list model =
-    model.background :: model.walls @ [ model.bird ] @ [ model.scoreboard ] 
+  let model_to_list model = List.flatten [
+      [ model.background ];
+      model.walls;
+      model.cookies;
+      [ model.bird ];
+      [ model.scoreboard ];
+  ]
   in
   let render_game_entity entity =
     begin match entity.typ with
@@ -342,9 +354,8 @@ let reactive_view : Dom.node Js.t =
         end
       | `Cookie ->
         let style = style_of_entity entity
-            "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fs14.favim.\
-             com%2Forig%2F160524%2Fbts-fire-gif-suga-Favim.com-4339714.\
-             gif&f=1"
+            "https://proxy.duckduckgo.com/iu/?u=https%3A%2F%2Ftse3.mm.bing.net\
+             %2Fth%3Fid%3DOIP.h-BQl88HtAC9woJ2IGgZxQHaIM%26pid%3D15.1&f=1"
         in
         H.div ~a:[ H.a_style style ] []
       | `Wall ->
@@ -383,7 +394,7 @@ let reactive_view : Dom.node Js.t =
         )
       in
       let background_color = "red" in
-      let z_index = if entity.typ = `Bird then 1 else -1 in
+      let z_index = if List.mem entity.typ [`Bird; `Cookie] then 1 else -1 in
       let debug_style = style_of_entity ~background_color ~z_index entity "" in
       let debug_style_text = style_of_entity ~z_index:2 entity "" in
       H.div ~a:[ H.a_style debug_style ] [
