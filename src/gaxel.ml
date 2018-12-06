@@ -254,7 +254,7 @@ let game_model_s : Game.Model.t option React.signal =
       let bird =
         if model.bird.collided then model.bird else 
           model.bird
-          |> Game.Entity.move_y (-70)
+          (* |> Game.Entity.move_y (-70) *)
           |> Game.Entity.mark_if_collision model.walls
       in
       { model with bird }
@@ -262,12 +262,12 @@ let game_model_s : Game.Model.t option React.signal =
       let dimensions = model.background.width, model.background.height in
       let walls =
         model.walls
-        |> List.map (Game.Entity.move_x (-5))
+        (* |> List.map (Game.Entity.move_x (-5)) *)
         |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
         |> List.append (Game.Entity.init_wall frame dimensions) in
       let bird =
         model.bird
-        |> Game.Entity.move_y 11
+        (* |> Game.Entity.move_y 11 *)
         |> Game.Entity.mark_if_collision walls in
       let scoreboard, cookies =
         let cookies =
@@ -275,7 +275,7 @@ let game_model_s : Game.Model.t option React.signal =
           (*goto could map 'apply_movement' here instead, which should be saved pr. entity
             < should also include the info about who's being followed?
           *)
-          |> List.map (Game.Entity.move_x (-10))
+          (* |> List.map (Game.Entity.move_x (-10)) *)
           |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
           |> List.append (Game.Entity.init_cookie frame dimensions) in
         let cookies_left = 
@@ -350,7 +350,7 @@ let reactive_view : Dom.node Js.t =
       model.cookies;
       [ model.bird ];
       [ model.scoreboard ];
-  ]
+    ]
   in
   let render_game_entity entity =
     begin match entity.typ with
@@ -431,13 +431,30 @@ let reactive_view : Dom.node Js.t =
       render_debug_overlay entity;
     ]
   in
-  game_model_s |> S.map (fun model_opt ->
-      model_opt
-      |> CCOpt.to_list
-      |> CCList.flat_map model_to_list
-      |> List.map render_full_entity
+  let rlist =
+    game_model_s |> S.map (fun model_opt ->
+        log "game_model update\n";
+        model_opt
+        |> CCOpt.to_list
+        |> CCList.flat_map model_to_list
+        |> List.map render_full_entity
+      )
+    |> RList.from_signal
+  in
+  let _ = RList.(
+      rlist |> RList.event |> E.map (function
+          | Patch l ->
+            l |> List.iter (function
+                | I _ -> log "rlist patch insert\n"
+                | R _ -> log "rlist patch removal\n"
+                | U _ -> log "rlist patch update\n"
+                | X _ -> log "rlist patch exchange\n"
+              )
+          | Set _ -> log "rlist set\n"
+        )
     )
-  |> RList.from_signal
+  in
+  rlist 
   |> R.div 
   |> Tyxml_js.To_dom.of_node
 
