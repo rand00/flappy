@@ -127,7 +127,7 @@ module Game = struct
         && Random.float 1.0 < (0.2 *. dist_mul)
       in
       if not time_to_spawn then [] else (
-        let width = 80
+        let width = 200
         and pos_x = view_w
         and pos_y = (Random.float 1. *. float view_h) |> truncate in
         [
@@ -150,7 +150,12 @@ module Game = struct
       pos_y = view_h - 80;
       collided = false;
     }
-    
+
+    let increment_score s' e =
+      match e.typ with
+      | `Scoreboard s -> { e with typ = `Scoreboard (s + s') }
+      | _ -> failwith "wrong type"
+
     let move_x px e = {
       e with pos_x = e.pos_x + px
     }
@@ -262,15 +267,23 @@ let game_model_s : Game.Model.t option React.signal =
         model.bird
         |> Game.Entity.move_y 11
         |> Game.Entity.mark_if_collision walls in
-      let cookies =
-        (*goto filter on out of bounds*)
-        model.cookies
-        |> List.map (Game.Entity.move_x (-6))
-        (*goto fix there is no cake :( *)
-        |> List.append (Game.Entity.init_cookie frame dimensions)
+      let scoreboard, cookies =
+        let cookies =
+          model.cookies
+          |> List.map (Game.Entity.move_x (-10))
+          |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
+          |> List.append (Game.Entity.init_cookie frame dimensions) in
+        let cookies_left = 
+          cookies
+          |> List.filter (not % Game.Entity.collides [bird]) in
+        let score_round = List.(length cookies - length cookies_left) in
+        let scoreboard =
+          model.scoreboard
+          |> Game.Entity.increment_score score_round
+        in
+        scoreboard, cookies_left
       in
-      (* log "cookies length = %d\n" (List.length cookies); *)
-      { model with bird; walls; cookies }
+      { model with bird; walls; cookies; scoreboard }
     | `ViewResize dimensions ->
       let prev_dimensions = (model.background.width, model.background.height) in
       let reposition e =
@@ -354,8 +367,11 @@ let reactive_view : Dom.node Js.t =
         end
       | `Cookie ->
         let style = style_of_entity entity
-            "https://proxy.duckduckgo.com/iu/?u=https%3A%2F%2Ftse3.mm.bing.net\
-             %2Fth%3Fid%3DOIP.h-BQl88HtAC9woJ2IGgZxQHaIM%26pid%3D15.1&f=1"
+            "https://proxy.duckduckgo.com/iu/?u=https%3A%2F%2F68.media.tumblr.\
+             com%2Fc9ed5ad2224ac3e259128282211bb967%2Ftumblr_oq0gpuyQ1U1wpimvfo1\
+             _500.png&f=1"
+            (* "https://proxy.duckduckgo.com/iu/?u=https%3A%2F%2Ftse3.mm.bing.net\
+             *  %2Fth%3Fid%3DOIP.h-BQl88HtAC9woJ2IGgZxQHaIM%26pid%3D15.1&f=1" *)
         in
         H.div ~a:[ H.a_style style ] []
       | `Wall ->
