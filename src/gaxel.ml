@@ -11,7 +11,7 @@ let game_node_id = "gaxel"
 
 (*goto game todo
   . performance; 
-    . test performance of board with framerate but no movement
+    . think if it's possible to have the style update separately from dom-node?
   . make milkshakes move in some kind of pattern
     . could this be a general entity thing? to have an animation-spec 
       < try to avoid a function here
@@ -254,7 +254,7 @@ let game_model_s : Game.Model.t option React.signal =
       let bird =
         if model.bird.collided then model.bird else 
           model.bird
-          (* |> Game.Entity.move_y (-70) *)
+          |> Game.Entity.move_y (-70)
           |> Game.Entity.mark_if_collision model.walls
       in
       { model with bird }
@@ -262,12 +262,12 @@ let game_model_s : Game.Model.t option React.signal =
       let dimensions = model.background.width, model.background.height in
       let walls =
         model.walls
-        (* |> List.map (Game.Entity.move_x (-5)) *)
+        |> List.map (Game.Entity.move_x (-5))
         |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
         |> List.append (Game.Entity.init_wall frame dimensions) in
       let bird =
         model.bird
-        (* |> Game.Entity.move_y 11 *)
+        |> Game.Entity.move_y 11
         |> Game.Entity.mark_if_collision walls in
       let scoreboard, cookies =
         let cookies =
@@ -275,16 +275,16 @@ let game_model_s : Game.Model.t option React.signal =
           (*goto could map 'apply_movement' here instead, which should be saved pr. entity
             < should also include the info about who's being followed?
           *)
-          (* |> List.map (Game.Entity.move_x (-10)) *)
+          |> List.map (Game.Entity.move_x (-10))
           |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
           |> List.append (Game.Entity.init_cookie frame dimensions) in
         let cookies_left = 
           cookies
           |> List.filter (not % Game.Entity.collides [bird]) in
-        let score_round = List.(length cookies - length cookies_left) in
+        let scored_now = List.(length cookies - length cookies_left) in
         let scoreboard =
           model.scoreboard
-          |> Game.Entity.increment_score score_round 
+          |> Game.Entity.increment_score scored_now
         in
         scoreboard, cookies_left
       in
@@ -431,30 +431,20 @@ let reactive_view : Dom.node Js.t =
       render_debug_overlay entity;
     ]
   in
-  let rlist =
+  let rlist_entity =
     game_model_s |> S.map (fun model_opt ->
         log "game_model update\n";
         model_opt
         |> CCOpt.to_list
         |> CCList.flat_map model_to_list
-        |> List.map render_full_entity
       )
     |> RList.from_signal
   in
-  let _ = RList.(
-      rlist |> RList.event |> E.map (function
-          | Patch l ->
-            l |> List.iter (function
-                | I _ -> log "rlist patch insert\n"
-                | R _ -> log "rlist patch removal\n"
-                | U _ -> log "rlist patch update\n"
-                | X _ -> log "rlist patch exchange\n"
-              )
-          | Set _ -> log "rlist set\n"
-        )
-    )
+  let rlist_html = rlist_entity |> RList.map render_full_entity
   in
-  rlist 
+  (* let _ = Debug.RList.patch "entity" rlist_entity in
+   * let _ = Debug.RList.patch "html" rlist_html in *)
+  rlist_html
   |> R.div 
   |> Tyxml_js.To_dom.of_node
 
@@ -481,7 +471,6 @@ let render () =
     update_view_size () |> ignore;
     Js._true
   )
-
 
 let main () =
   Dom_html.window##.onload := Dom_html.handler (fun _ -> 
