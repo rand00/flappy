@@ -5,8 +5,8 @@ set -e
 
 ## JS
 
-jsbyte="gaxel.byte"
-jsout="webout/gaxel.js"
+jsbyte="flap.byte"
+jsout="webout/flap.js"
 
 ocamlbuild \
     -use-ocamlfind \
@@ -18,9 +18,7 @@ js_of_ocaml "$jsbyte" -o "$jsout"
 
 ## HTML
 
-ocamlbuild -use-ocamlfind index_html.byte
+ocamlbuild -use-ocamlfind index_ht.byte
+./index_ht.byte > webout/index.html
 
-./index_html.byte > webout/index.html
 
-
-    

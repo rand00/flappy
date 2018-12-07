@@ -7,7 +7,7 @@ module R = Tyxml_js.R.Html
 
 let debug = false
 let fps = 30.
-let game_node_id = "gaxel"
+let game_node_id = "flap"
 
 (*goto game todo
   . performance; 
