@@ -2,13 +2,14 @@
 Implementation of some kind of flappy-bird game.
 Primary point of this is to showcase how to use OCaml and its existing 
 libraries, to write powerful but simple code with an Elm-like structure. 
+See `flap.ml` for the game-code.
 
 #### Goals:
 - [x] Elm-like code using frp (`react`) + typesafe html (`tyxml`) + 
-virtual DOM (`reactiveData` + `tyxml_js`). See `flap.ml` for the game-code.
-  * Simple  
-  * Functional 
-  * Typesafe 
+virtual DOM (`reactiveData` + `tyxml_js`). 
+  * Simple
+  * Typesafe + functional - at least concerning the body of the application
+  * Minimal direct usage of js-bindings.
   * Visualization code separated from game-model update.
 - [x] Avoid frameworks, use libraries only.
 - [ ] Coming up with an elegant solution to *identity of object*-related 
