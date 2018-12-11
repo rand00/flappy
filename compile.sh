@@ -3,6 +3,8 @@
 
 set -e
 
+[ ! -e webout ] && mkdir webout
+
 ## JS
 
 jsbyte="flap.byte"
