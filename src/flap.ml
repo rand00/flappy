@@ -229,6 +229,14 @@ module Game = struct
     end
 
     include T
+
+    let to_list m = List.flatten [
+      [ m.background ];
+      m.walls;
+      m.cookies;
+      [ m.bird ];
+      [ m.scoreboard ];
+    ]
     
     let init view_dimensions = {
       bird = Entity.init_bird view_dimensions;
@@ -288,7 +296,13 @@ let game_model_s : Game.Model.t option React.signal =
         in
         scoreboard, cookies_left
       in
-      { model with bird; walls; cookies; scoreboard }
+      {
+        bird;
+        walls;
+        cookies;
+        scoreboard;
+        background = model.background
+      }
     | `ViewResize dimensions ->
       let prev_dimensions = (model.background.width, model.background.height) in
       let reposition e =
@@ -344,14 +358,6 @@ let style_of_entity
   . think first if this should have some other interface (e.g. taking reactive html instead!)
 *)
 let reactive_view : Dom.node Js.t =
-  let model_to_list model = List.flatten [
-      [ model.background ];
-      model.walls;
-      model.cookies;
-      [ model.bird ];
-      [ model.scoreboard ];
-    ]
-  in
   let render_game_entity entity =
     begin match entity.typ with
       | `Bird ->
@@ -436,7 +442,7 @@ let reactive_view : Dom.node Js.t =
         log "game_model update\n";
         model_opt
         |> CCOpt.to_list
-        |> CCList.flat_map model_to_list
+        |> CCList.flat_map Game.Model.to_list
       )
     |> RList.from_signal
   in
