@@ -10,7 +10,11 @@ let fps = 30.
 let game_node_id = "flap"
 
 (*goto game todo
+  . solve the homing-missile problem in this frp game
+    . idea; spawn homing missiles that one should avoid + make smash into walls
   . performance; 
+    . check if wanna use request animation-frame? 
+      > then would need time-diff to simulate instead - less simple..
     . think if it's possible to have the style update separately from dom-node?
   . make milkshakes move in some kind of pattern
     . could this be a general entity thing? to have an animation-spec 
@@ -20,11 +24,10 @@ let game_node_id = "flap"
     . idea; move left/right too?
     . idea; more interesting physics
       . idea; bouncing on walls instead of dying
-  . solve the homing-missile problem in this frp game
-    . idea; spawn homing missiles that one should avoid + make smash into walls
 *)
 
 let sp = Printf.sprintf
+(*> todo make a version of log that auto-prints newline*)
 let log = Printf.printf 
 let (%) f g x = f (g x)
 
