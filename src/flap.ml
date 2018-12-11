@@ -64,12 +64,15 @@ module Game = struct
 
     module T = struct 
 
+      type id = int
+      
       type typ = [
         | `Bird
         | `Wall
         | `Background
         | `Scoreboard of int
         | `Cookie
+        | `Homing_missile of id option
       ][@@deriving show]
 
       type t = {
@@ -79,11 +82,19 @@ module Game = struct
         pos_x : int;
         pos_y : int;
         collided : bool;
+        id : id;
       }[@@deriving show]
 
     end
 
     include T
+
+    let make_id =
+      let id = ref 0 in
+      fun () ->
+        let r = !id in
+        incr id;
+        r
     
     let init_bird (view_w, view_h) = {
       typ = `Bird;
@@ -92,6 +103,7 @@ module Game = struct
       pos_x = (float view_w /. 4.) |> truncate;
       pos_y = (float view_h /. 2.) |> truncate;
       collided = false;
+      id = make_id ()
     }
 
     let init_background (view_w, view_h) = {
@@ -101,6 +113,7 @@ module Game = struct
       pos_x = 0;
       pos_y = 0;
       collided = false;
+      id = make_id ()
     }
 
     let init_wall frame (view_w, view_h) =
@@ -121,6 +134,7 @@ module Game = struct
             pos_x = view_w;
             pos_y = if Random.bool () then 0 else view_h - height;
             collided = false;
+            id = make_id ()
           }
         ]
       )
@@ -143,10 +157,34 @@ module Game = struct
             pos_x;
             pos_y;
             collided = false;
+            id = make_id ()
           }
         ]
       )
 
+    let init_homing_missile frame (view_w, view_h) =
+      let dist_mul = 3. in
+      let time_to_spawn =
+        frame mod truncate (fps *. dist_mul) = 0
+        && Random.float 1.0 < (0.2 *. dist_mul)
+      in
+      if not time_to_spawn then [] else (
+        let width = 200
+        and pos_x = view_w
+        and pos_y = (Random.float 1. *. float view_h) |> truncate in
+        [
+          {
+            typ = `Homing_missile None;
+            width;
+            height = width;
+            pos_x;
+            pos_y;
+            collided = false;
+            id = make_id ()
+          }
+        ]
+      )
+    
     let init_scoreboard (view_w, view_h) = {
       typ = `Scoreboard 0;
       width = 0;
@@ -154,6 +192,7 @@ module Game = struct
       pos_x = view_w - 150;
       pos_y = view_h - 80;
       collided = false;
+      id = make_id ()
     }
 
     let increment_score s' e =
@@ -227,6 +266,7 @@ module Game = struct
         bird : Entity.t;
         walls : Entity.t list;
         cookies : Entity.t list;
+        homing_missiles : Entity.t list;
         background : Entity.t;
         scoreboard : Entity.t;
       }[@@deriving show]
@@ -240,6 +280,7 @@ module Game = struct
       m.walls;
       m.cookies;
       [ m.bird ];
+      m.homing_missiles;
       [ m.scoreboard ];
     ]
     
@@ -247,6 +288,7 @@ module Game = struct
       bird = Entity.init_bird view_dimensions;
       walls = [];
       cookies = [];
+      homing_missiles = [];
       background = Entity.init_background view_dimensions;
       scoreboard = Entity.init_scoreboard view_dimensions;
     }
