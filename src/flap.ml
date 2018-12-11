@@ -156,7 +156,9 @@ module Game = struct
     let increment_score s' e =
       match e.typ with
       | `Scoreboard s -> { e with typ = `Scoreboard (s + s') }
-      | _ -> failwith "this was not a scoreboard!"
+      | typ ->
+        log "this was not a scoreboard!\n";
+        e 
 
     let move_x px e = {
       e with pos_x = e.pos_x + px
