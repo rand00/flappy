@@ -64,7 +64,7 @@ module Game = struct
 
     module T = struct 
 
-      type id = int
+      type id = int [@@deriving show]
       
       type typ = [
         | `Bird
@@ -341,12 +341,28 @@ let game_model_s : Game.Model.t option React.signal =
           model.scoreboard
           |> Game.Entity.increment_score scored_now
         in
-        scoreboard, cookies_left
+        scoreboard, cookies_left in
+      (*goto 
+        . make missiles retarget closest targets (in our case just bird)
+        . make missiles move depending on 
+          . their velocity/acceleration in some direction
+          . the position of target (if any)
+            . get position from bird with target id (through some system for requesting it)
+              . if ref is lost, (None)
+                . change ref to other target / remove ref 
+              . else continue
+      *)
+      let homing_missiles = 
+        model.homing_missiles
+        |> List.map (Game.Entity.move_x (-10))
+        |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
+        |> List.append (Game.Entity.init_homing_missile frame dimensions) 
       in
       {
         bird;
         walls;
         cookies;
+        homing_missiles;
         scoreboard;
         background = model.background
       }
@@ -358,10 +374,18 @@ let game_model_s : Game.Model.t option React.signal =
       let bird = model.bird |> reposition in
       let walls = model.walls |> List.map reposition in
       let cookies = model.cookies |> List.map reposition in
+      let homing_missiles = model.homing_missiles |> List.map reposition in
       let scoreboard = model.scoreboard |> reposition in
       let background = model.background |> Game.Entity.resize dimensions 
       in
-      { bird; walls; background; scoreboard; cookies }
+      {
+        bird;
+        walls;
+        background;
+        homing_missiles;
+        scoreboard;
+        cookies
+      }
   in
   Game.Event.sink_e
   |> E.fold update (Game.Model.init (1920, 1080))
