@@ -10,13 +10,8 @@ let fps = 30.
 
 (*goto game todo
   . finetune/extend homing missiles;
-    . hitbox
-      . visualize whole figure
-      . hitbox too big
-    . initial position 
-      . idea; at top of pillars?
-    . rotation of figure depending on direction
     . death animation / explosion
+    . rotation of figure depending on direction
   . implement local multiplayer (bird v antimatter-bird)
   . experiment with a component structure using frp + vdom
   . performance; 
@@ -218,7 +213,7 @@ module Game = struct
         | `Homing_missile missile_data -> 
           let movement_vector =
             if missile.collided then
-              V2.v 0. 14.
+              V2.v 0. 0.
             else begin
               match missile_data.target with
               | None -> missile_data.movement_vector
@@ -364,7 +359,7 @@ let game_model_s : Game.Model.t option React.signal =
         if model.bird.collided then model.bird else 
           model.bird
           |> Game.Entity.move_y (-70)
-          |> Game.Entity.mark_if_collision model.walls
+          |> Game.Entity.mark_if_collision (model.walls @ model.homing_missiles)
       in
       { model with bird }
     | `Frame frame ->
@@ -374,10 +369,17 @@ let game_model_s : Game.Model.t option React.signal =
         |> List.map (Game.Entity.move_x (-5))
         |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
         |> List.append (Game.Entity.init_wall frame dimensions) in
+      let homing_missiles = 
+        model.homing_missiles
+        |> List.map (Game.Entity.Homing_missile.choose_target [model.bird])
+        |> List.map Game.Entity.Homing_missile.move
+        |> List.map (Game.Entity.mark_if_collision model.walls)
+        |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
+        |> List.append (Game.Entity.Homing_missile.init frame dimensions) in
       let bird =
         model.bird
         |> Game.Entity.move_y 11
-        |> Game.Entity.mark_if_collision (walls @ model.homing_missiles) in
+        |> Game.Entity.mark_if_collision (walls @ homing_missiles) in
       let scoreboard, cookies =
         let cookies =
           model.cookies
@@ -395,14 +397,7 @@ let game_model_s : Game.Model.t option React.signal =
           model.scoreboard
           |> Game.Entity.increment_score scored_now
         in
-        scoreboard, cookies_left in
-      let homing_missiles = 
-        model.homing_missiles
-        |> List.map (Game.Entity.Homing_missile.choose_target [model.bird])
-        |> List.map Game.Entity.Homing_missile.move
-        |> List.map (Game.Entity.mark_if_collision model.walls)
-        |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
-        |> List.append (Game.Entity.Homing_missile.init frame dimensions) 
+        scoreboard, cookies_left 
       in
       {
         bird;
@@ -490,7 +485,13 @@ let reactive_view : Dom.node Js.t =
         H.div ~a:[ H.a_style style ] []
       | `Homing_missile _ ->
         let style =
-          style_of_entity entity "assets/blue_flame.gif" ~extend:30
+          let image, extend =
+            if entity.collided then
+              "assets/explosion.gif", 60
+            else
+              "assets/blue_flame.gif", 20
+          in
+          style_of_entity entity image  ~extend
         in
         H.div ~a:[ H.a_style style ] []
       | `Wall ->
