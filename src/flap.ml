@@ -7,11 +7,12 @@ module R = Tyxml_js.R.Html
 
 let debug = false
 let fps = 30.
-let game_node_id = "flap"
 
 (*goto game todo
-  . solve the homing-missile problem in this frp game
-    . idea; spawn homing missiles that one should avoid + make smash into walls
+  . finetune/extend homing missiles;
+    . hitbox
+    . initial position 
+    . death animation / explosion
   . performance; 
     . check if wanna use request animation-frame? 
       > then would need time-diff to simulate instead - less simple..
@@ -64,15 +65,21 @@ module Game = struct
 
     module T = struct 
 
-      type typ = [
+      type homing_missile = {
+        target : t option;
+        movement_vector : V2.t;
+      }[@@deriving show]
+      
+      and typ = [
         | `Bird
         | `Wall
         | `Background
         | `Scoreboard of int
         | `Cookie
+        | `Homing_missile of homing_missile
       ][@@deriving show]
 
-      type t = {
+      and t = {
         typ : typ;
         width : int;
         height : int;
@@ -80,10 +87,16 @@ module Game = struct
         pos_y : int;
         collided : bool;
       }[@@deriving show]
-
+  (*< todo remove id again if homing missiles doesn't need them*)
+      
     end
 
     include T
+
+    let distance e e' =
+      let x , y  = float e.pos_x, float e.pos_y in
+      let x', y' = float e'.pos_x, float e'.pos_y in
+      sqrt ((x -. x') ** 2. +. (y -. y') ** 2.)
     
     let init_bird (view_w, view_h) = {
       typ = `Bird;
@@ -147,6 +160,80 @@ module Game = struct
         ]
       )
 
+    module Homing_missile = struct 
+    
+      let init frame (view_w, view_h) =
+        let dist_mul = 3. in
+        let time_to_spawn =
+          frame mod truncate (fps *. dist_mul) = 0
+          && Random.float 1.0 < (0.2 *. dist_mul)
+        in
+        if not time_to_spawn then [] else (
+          let width = 200
+          and pos_x = view_w / 2
+          and pos_y = (Random.float 1. *. float view_h) |> truncate in
+          [
+            {
+              typ = `Homing_missile {
+                  target = None;
+                  movement_vector = V2.v (-1.) 0.
+                };
+              width;
+              height = width;
+              pos_x;
+              pos_y;
+              collided = false;
+            }
+          ]
+        )
+
+      let choose_target targets missile =
+        let target =
+          List.fold_left (fun acc e ->
+              match acc with
+              | None -> Some e
+              | Some e' ->
+                let chosen =
+                  if distance missile e < distance missile e' then e else e'
+                in Some chosen
+            ) None targets
+        in
+        match missile.typ with
+        | `Homing_missile missile_data ->
+          { missile with typ = `Homing_missile {
+                missile_data with target;
+              }}
+        | _ ->
+          log "choose_target: was not a missile!\n";
+          missile
+
+      let move missile =
+        match missile.typ with
+        | `Homing_missile missile_data -> 
+          let movement_vector =
+            if missile.collided then
+              V2.v 0. 14.
+            else begin
+              match missile_data.target with
+              | None -> missile_data.movement_vector
+              | Some target ->
+                let target_vec = V2.v (float target.pos_x) (float target.pos_y) in
+                let missile_vec = V2.v (float missile.pos_x) (float missile.pos_y) in
+                let diff_vec = V2.(target_vec - missile_vec) in
+                let dist = V2.norm diff_vec in
+                let dist_factor = min (0.000014 *. sqrt dist) 0.5 in
+                V2.(missile_data.movement_vector + (dist_factor * diff_vec))
+            end
+          in
+          { missile with
+            typ = `Homing_missile { missile_data with movement_vector };
+            pos_x = missile.pos_x + (truncate V2.(x movement_vector));
+            pos_y = missile.pos_y + (truncate V2.(y movement_vector));
+          }
+        | _ -> missile (*goto make 'log_and_return "tag" entity' a helper *)
+
+    end
+    
     let init_scoreboard (view_w, view_h) = {
       typ = `Scoreboard 0;
       width = 0;
@@ -227,6 +314,7 @@ module Game = struct
         bird : Entity.t;
         walls : Entity.t list;
         cookies : Entity.t list;
+        homing_missiles : Entity.t list;
         background : Entity.t;
         scoreboard : Entity.t;
       }[@@deriving show]
@@ -240,6 +328,7 @@ module Game = struct
       m.walls;
       m.cookies;
       [ m.bird ];
+      m.homing_missiles;
       [ m.scoreboard ];
     ]
     
@@ -247,6 +336,7 @@ module Game = struct
       bird = Entity.init_bird view_dimensions;
       walls = [];
       cookies = [];
+      homing_missiles = [];
       background = Entity.init_background view_dimensions;
       scoreboard = Entity.init_scoreboard view_dimensions;
     }
@@ -281,7 +371,7 @@ let game_model_s : Game.Model.t option React.signal =
       let bird =
         model.bird
         |> Game.Entity.move_y 11
-        |> Game.Entity.mark_if_collision walls in
+        |> Game.Entity.mark_if_collision (walls @ model.homing_missiles) in
       let scoreboard, cookies =
         let cookies =
           model.cookies
@@ -299,12 +389,20 @@ let game_model_s : Game.Model.t option React.signal =
           model.scoreboard
           |> Game.Entity.increment_score scored_now
         in
-        scoreboard, cookies_left
+        scoreboard, cookies_left in
+      let homing_missiles = 
+        model.homing_missiles
+        |> List.map (Game.Entity.Homing_missile.choose_target [model.bird])
+        |> List.map Game.Entity.Homing_missile.move
+        |> List.map (Game.Entity.mark_if_collision model.walls)
+        |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
+        |> List.append (Game.Entity.Homing_missile.init frame dimensions) 
       in
       {
         bird;
         walls;
         cookies;
+        homing_missiles;
         scoreboard;
         background = model.background
       }
@@ -316,10 +414,18 @@ let game_model_s : Game.Model.t option React.signal =
       let bird = model.bird |> reposition in
       let walls = model.walls |> List.map reposition in
       let cookies = model.cookies |> List.map reposition in
+      let homing_missiles = model.homing_missiles |> List.map reposition in
       let scoreboard = model.scoreboard |> reposition in
       let background = model.background |> Game.Entity.resize dimensions 
       in
-      { bird; walls; background; scoreboard; cookies }
+      {
+        bird;
+        walls;
+        background;
+        homing_missiles;
+        scoreboard;
+        cookies
+      }
   in
   Game.Event.sink_e
   |> E.fold update (Game.Model.init (1920, 1080))
@@ -358,10 +464,7 @@ let style_of_entity
     @ (z_index |> CCOpt.map Style.z_index |> CCOpt.to_list)
   )
 
-(*>old type: Html_types.body_content H.elt list S.t*)
-(*> goto make this into a 'elm' library function
-  . think first if this should have some other interface (e.g. taking reactive html instead!)
-*)
+(*old type: Html_types.body_content H.elt list S.t*)
 let reactive_view : Dom.node Js.t =
   let render_game_entity entity =
     begin match entity.typ with
@@ -370,46 +473,26 @@ let reactive_view : Dom.node Js.t =
           let extend = 100 in
           let style = 
             if entity.collided then
-              style_of_entity entity
-                ~extend
-                ~rotate:(`Deg 90)
-                "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
-            else 
-              style_of_entity entity
-                ~extend
-                "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
+              style_of_entity entity ~extend ~rotate:(`Deg 90) "assets/bird.gif"
+            else
+              style_of_entity entity ~extend "assets/bird.gif"
           in
           H.div ~a:[ H.a_style style ] []
         end
       | `Cookie ->
-        let style = style_of_entity entity
-            "https://proxy.duckduckgo.com/iu/?u=https%3A%2F%2F68.media.tumblr.\
-             com%2Fc9ed5ad2224ac3e259128282211bb967%2Ftumblr_oq0gpuyQ1U1wpimvfo1\
-             _500.png&f=1"
-            (* "https://proxy.duckduckgo.com/iu/?u=https%3A%2F%2Ftse3.mm.bing.net\
-             *  %2Fth%3Fid%3DOIP.h-BQl88HtAC9woJ2IGgZxQHaIM%26pid%3D15.1&f=1" *)
-        in
+        let style = style_of_entity entity "assets/milkshake.png" in
+        H.div ~a:[ H.a_style style ] []
+      | `Homing_missile _ ->
+        let style = style_of_entity entity "assets/chucky.png" in
         H.div ~a:[ H.a_style style ] []
       | `Wall ->
-        let style = style_of_entity entity
-            "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fs14.favim.\
-             com%2Forig%2F160524%2Fbts-fire-gif-suga-Favim.com-4339714.\
-             gif&f=1"
-        in
+        let style = style_of_entity entity "assets/korean.gif" in
         H.div ~a:[ H.a_style style ] []
-      (* "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2F\
-       *  www.hdwallback.net%2Fwp-content%2Fuploads%2F2017%2F12%2F\
-       *  brick-wallpapers-images.jpg&f=1" *)
       | `Background ->
-        let style = style_of_entity entity 
-            "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fhdwpro.com\
-             %2Fwp-content%2Fuploads%2F2016%2F03%2FNature-Amazing-\
-             Picture.jpeg&f=1"
-        in
+        let style = style_of_entity entity "assets/turtle_golf.jpeg" in
         H.div ~a:[ H.a_style style ] []
       | `Scoreboard score ->
-        let style = style_of_entity entity ""
-        in
+        let style = style_of_entity entity "" in
         let content = H.pcdata (sp "%d" score) in
         H.div ~a:[ H.a_style style ] [ content ]
     end
@@ -423,6 +506,7 @@ let reactive_view : Dom.node Js.t =
           | `Background -> "background"
           | `Scoreboard _ -> "scoreboard"
           | `Cookie -> "cookie"
+          | `Homing_missile _ -> "homing-missile"
         )
       in
       let background_color = "red" in
@@ -467,7 +551,7 @@ let update_view_size () =
   Game.Event.sink_eupd (`ViewResize (w, h))
 
 let render () =
-  let root = Dom_html.getElementById game_node_id in
+  let root = Dom_html.getElementById Constants.html_id in
   Dom.appendChild root reactive_view;
   Dom_html.document##.onkeydown := Dom_html.handler (fun e ->
     Printf.printf "keycode: %d\n" e##.keyCode;

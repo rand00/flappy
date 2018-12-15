@@ -2,11 +2,9 @@
 open Tyxml
 module H = Html
 
-let js_div_id = "flap" 
-
 let content = [
   H.h1 [ H.pcdata "flap flap" ];
-  H.div ~a:[H.a_id js_div_id] [];
+  H.div ~a:[H.a_id Constants.html_id] [];
   H.noscript [H.pcdata "Sorry, you need to enable JavaScript to see this page."]
 ]
 
