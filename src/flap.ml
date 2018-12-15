@@ -65,17 +65,22 @@ module Game = struct
     module T = struct 
 
       type id = int [@@deriving show]
+
+      type homing_missile = {
+        target : t option;
+        movement_vector : V2.t;
+      }[@@deriving show]
       
-      type typ = [
+      and typ = [
         | `Bird
         | `Wall
         | `Background
         | `Scoreboard of int
         | `Cookie
-        | `Homing_missile of id option
+        | `Homing_missile of homing_missile
       ][@@deriving show]
 
-      type t = {
+      and t = {
         typ : typ;
         width : int;
         height : int;
@@ -84,7 +89,8 @@ module Game = struct
         collided : bool;
         id : id;
       }[@@deriving show]
-
+  (*< todo remove id again if homing missiles doesn't need them*)
+      
     end
 
     include T
@@ -95,6 +101,11 @@ module Game = struct
         let r = !id in
         incr id;
         r
+
+    let distance e e' =
+      let x , y  = float e.pos_x, float e.pos_y in
+      let x', y' = float e'.pos_x, float e'.pos_y in
+      sqrt ((x -. x') ** 2. +. (y -. y') ** 2.)
     
     let init_bird (view_w, view_h) = {
       typ = `Bird;
@@ -162,28 +173,78 @@ module Game = struct
         ]
       )
 
-    let init_homing_missile frame (view_w, view_h) =
-      let dist_mul = 3. in
-      let time_to_spawn =
-        frame mod truncate (fps *. dist_mul) = 0
-        && Random.float 1.0 < (0.2 *. dist_mul)
-      in
-      if not time_to_spawn then [] else (
-        let width = 200
-        and pos_x = view_w
-        and pos_y = (Random.float 1. *. float view_h) |> truncate in
-        [
-          {
-            typ = `Homing_missile None;
-            width;
-            height = width;
-            pos_x;
-            pos_y;
-            collided = false;
-            id = make_id ()
+    module Homing_missile = struct 
+    
+      let init frame (view_w, view_h) =
+        let dist_mul = 3. in
+        let time_to_spawn =
+          frame mod truncate (fps *. dist_mul) = 0
+          && Random.float 1.0 < (0.2 *. dist_mul)
+        in
+        if not time_to_spawn then [] else (
+          let width = 200
+          and pos_x = view_w / 2
+          and pos_y = (Random.float 1. *. float view_h) |> truncate in
+          [
+            {
+              typ = `Homing_missile {
+                  target = None;
+                  movement_vector = V2.v (-1.) 0.
+                };
+              width;
+              height = width;
+              pos_x;
+              pos_y;
+              collided = false;
+              id = make_id ()
+            }
+          ]
+        )
+
+      let choose_target targets missile =
+        let target =
+          List.fold_left (fun acc e ->
+              match acc with
+              | None -> Some e
+              | Some e' ->
+                let chosen =
+                  if distance missile e < distance missile e' then e else e'
+                in Some chosen
+            ) None targets
+        in
+        match missile.typ with
+        | `Homing_missile missile_data ->
+          { missile with typ = `Homing_missile {
+                missile_data with target;
+              }}
+        | _ ->
+          log "choose_target: was not a missile!\n";
+          missile
+
+      let move missile =
+        match missile.typ with
+        | `Homing_missile missile_data -> 
+          let movement_vector = match missile_data.target with
+            | None -> missile_data.movement_vector
+            | Some target ->
+              let target_vec = V2.v (float target.pos_x) (float target.pos_y) in
+              let missile_vec = V2.v (float missile.pos_x) (float missile.pos_y) in
+              let diff_vec = V2.(target_vec - missile_vec) in
+              let dist = V2.norm diff_vec in
+              let dist_factor = min (0.000014 *. sqrt dist) 0.5 in
+              V2.(missile_data.movement_vector + (dist_factor * diff_vec))
+          in
+          { missile with
+            typ = `Homing_missile {
+                missile_data with 
+                movement_vector
+              };
+            pos_x = missile.pos_x + (truncate V2.(x movement_vector));
+            pos_y = missile.pos_y + (truncate V2.(y movement_vector));
           }
-        ]
-      )
+        | _ -> missile (*goto make 'log_and_return "tag" entity' a helper *)
+
+    end
     
     let init_scoreboard (view_w, view_h) = {
       typ = `Scoreboard 0;
@@ -343,7 +404,6 @@ let game_model_s : Game.Model.t option React.signal =
         in
         scoreboard, cookies_left in
       (*goto 
-        . make missiles retarget closest targets (in our case just bird)
         . make missiles move depending on 
           . their velocity/acceleration in some direction
           . the position of target (if any)
@@ -354,9 +414,10 @@ let game_model_s : Game.Model.t option React.signal =
       *)
       let homing_missiles = 
         model.homing_missiles
-        |> List.map (Game.Entity.move_x (-10))
+        |> List.map (Game.Entity.Homing_missile.choose_target [model.bird])
+        |> List.map Game.Entity.Homing_missile.move
         |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
-        |> List.append (Game.Entity.init_homing_missile frame dimensions) 
+        |> List.append (Game.Entity.Homing_missile.init frame dimensions) 
       in
       {
         bird;
@@ -424,10 +485,7 @@ let style_of_entity
     @ (z_index |> CCOpt.map Style.z_index |> CCOpt.to_list)
   )
 
-(*>old type: Html_types.body_content H.elt list S.t*)
-(*> goto make this into a 'elm' library function
-  . think first if this should have some other interface (e.g. taking reactive html instead!)
-*)
+(*old type: Html_types.body_content H.elt list S.t*)
 let reactive_view : Dom.node Js.t =
   let render_game_entity entity =
     begin match entity.typ with
