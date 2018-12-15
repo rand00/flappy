@@ -10,8 +10,11 @@ let fps = 30.
 let game_node_id = "flap"
 
 (*goto game todo
-  . solve the homing-missile problem in this frp game
-    . idea; spawn homing missiles that one should avoid + make smash into walls
+  . remove id's from entities
+  . finetune/extend homing missiles;
+    . hitbox
+    . initial position 
+    . death animation / explosion
   . performance; 
     . check if wanna use request animation-frame? 
       > then would need time-diff to simulate instead - less simple..
@@ -64,8 +67,6 @@ module Game = struct
 
     module T = struct 
 
-      type id = int [@@deriving show]
-
       type homing_missile = {
         target : t option;
         movement_vector : V2.t;
@@ -87,20 +88,12 @@ module Game = struct
         pos_x : int;
         pos_y : int;
         collided : bool;
-        id : id;
       }[@@deriving show]
   (*< todo remove id again if homing missiles doesn't need them*)
       
     end
 
     include T
-
-    let make_id =
-      let id = ref 0 in
-      fun () ->
-        let r = !id in
-        incr id;
-        r
 
     let distance e e' =
       let x , y  = float e.pos_x, float e.pos_y in
@@ -114,7 +107,6 @@ module Game = struct
       pos_x = (float view_w /. 4.) |> truncate;
       pos_y = (float view_h /. 2.) |> truncate;
       collided = false;
-      id = make_id ()
     }
 
     let init_background (view_w, view_h) = {
@@ -124,7 +116,6 @@ module Game = struct
       pos_x = 0;
       pos_y = 0;
       collided = false;
-      id = make_id ()
     }
 
     let init_wall frame (view_w, view_h) =
@@ -145,7 +136,6 @@ module Game = struct
             pos_x = view_w;
             pos_y = if Random.bool () then 0 else view_h - height;
             collided = false;
-            id = make_id ()
           }
         ]
       )
@@ -168,7 +158,6 @@ module Game = struct
             pos_x;
             pos_y;
             collided = false;
-            id = make_id ()
           }
         ]
       )
@@ -196,7 +185,6 @@ module Game = struct
               pos_x;
               pos_y;
               collided = false;
-              id = make_id ()
             }
           ]
         )
@@ -255,7 +243,6 @@ module Game = struct
       pos_x = view_w - 150;
       pos_y = view_h - 80;
       collided = false;
-      id = make_id ()
     }
 
     let increment_score s' e =
