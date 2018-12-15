@@ -11,8 +11,14 @@ let fps = 30.
 (*goto game todo
   . finetune/extend homing missiles;
     . hitbox
+      . visualize whole figure
+      . hitbox too big
     . initial position 
+      . idea; at top of pillars?
+    . rotation of figure depending on direction
     . death animation / explosion
+  . implement local multiplayer (bird v antimatter-bird)
+  . experiment with a component structure using frp + vdom
   . performance; 
     . check if wanna use request animation-frame? 
       > then would need time-diff to simulate instead - less simple..
@@ -169,7 +175,7 @@ module Game = struct
           && Random.float 1.0 < (0.2 *. dist_mul)
         in
         if not time_to_spawn then [] else (
-          let width = 200
+          let width = 30
           and pos_x = view_w / 2
           and pos_y = (Random.float 1. *. float view_h) |> truncate in
           [
@@ -483,7 +489,9 @@ let reactive_view : Dom.node Js.t =
         let style = style_of_entity entity "assets/milkshake.png" in
         H.div ~a:[ H.a_style style ] []
       | `Homing_missile _ ->
-        let style = style_of_entity entity "assets/chucky.png" in
+        let style =
+          style_of_entity entity "assets/blue_flame.gif" ~extend:30
+        in
         H.div ~a:[ H.a_style style ] []
       | `Wall ->
         let style = style_of_entity entity "assets/korean.gif" in
@@ -510,7 +518,13 @@ let reactive_view : Dom.node Js.t =
         )
       in
       let background_color = "red" in
-      let z_index = if List.mem entity.typ [`Bird; `Cookie] then 1 else -1 in
+      let z_index =
+        let put_hitbox_on_top = match entity.typ with
+          | `Bird | `Cookie | `Homing_missile _ -> true
+          | _ -> false
+        in
+        if put_hitbox_on_top then 1 else -1
+      in
       let debug_style = style_of_entity ~background_color ~z_index entity "" in
       let debug_style_text = style_of_entity ~z_index:2 entity "" in
       H.div ~a:[ H.a_style debug_style ] [
@@ -550,7 +564,7 @@ let update_view_size () =
   Dom_html.window##.innerHeight >>| fun h ->
   Game.Event.sink_eupd (`ViewResize (w, h))
 
-let render () =
+let init_game () =
   let root = Dom_html.getElementById Constants.html_id in
   Dom.appendChild root reactive_view;
   Dom_html.document##.onkeydown := Dom_html.handler (fun e ->
@@ -571,7 +585,7 @@ let main () =
   Dom_html.window##.onload := Dom_html.handler (fun _ -> 
     Random.self_init ();
     (* Game.Event.sink_eupd (`Frame 0); (\*for debug*\) *)
-    render ();
+    init_game ();
     Game.Event.feed_frp ();
     Js._false
   )
