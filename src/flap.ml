@@ -226,7 +226,7 @@ module Game = struct
         | `Homing_missile missile_data -> 
           let movement_vector =
             if missile.collided then
-              V2.v 0. 10.
+              V2.v 0. 14.
             else begin
               match missile_data.target with
               | None -> missile_data.movement_vector
@@ -240,10 +240,7 @@ module Game = struct
             end
           in
           { missile with
-            typ = `Homing_missile {
-                missile_data with 
-                movement_vector
-              };
+            typ = `Homing_missile { missile_data with movement_vector };
             pos_x = missile.pos_x + (truncate V2.(x movement_vector));
             pos_y = missile.pos_y + (truncate V2.(y movement_vector));
           }
@@ -389,7 +386,7 @@ let game_model_s : Game.Model.t option React.signal =
       let bird =
         model.bird
         |> Game.Entity.move_y 11
-        |> Game.Entity.mark_if_collision walls in
+        |> Game.Entity.mark_if_collision (walls @ model.homing_missiles) in
       let scoreboard, cookies =
         let cookies =
           model.cookies
@@ -408,15 +405,6 @@ let game_model_s : Game.Model.t option React.signal =
           |> Game.Entity.increment_score scored_now
         in
         scoreboard, cookies_left in
-      (*goto 
-        . make missiles move depending on 
-          . their velocity/acceleration in some direction
-          . the position of target (if any)
-            . get position from bird with target id (through some system for requesting it)
-              . if ref is lost, (None)
-                . change ref to other target / remove ref 
-              . else continue
-      *)
       let homing_missiles = 
         model.homing_missiles
         |> List.map (Game.Entity.Homing_missile.choose_target [model.bird])
