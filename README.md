@@ -12,8 +12,9 @@ virtual DOM (`reactiveData` + `tyxml_js`).
   * Minimal direct usage of js-bindings.
   * Visualization code separated from game-model update.
 - [x] Avoid frameworks, use libraries only.
-- [ ] Coming up with an elegant solution to *identity of object*-related 
+- [x] Coming up with an elegant solution to *identity of object*-related 
 problems. E.g. homing missiles.
+  * Having some way to calculate who the referenced entity is from the data is fine for homing missiles. Depends on what one wants to do. 
 - [ ] Composability of 'components' 
   * Is the Virtual DOM part of the code effectively composeable, when having 
     nested reactive nodes?
