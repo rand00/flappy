@@ -7,10 +7,8 @@ module R = Tyxml_js.R.Html
 
 let debug = false
 let fps = 30.
-let game_node_id = "flap"
 
 (*goto game todo
-  . remove id's from entities
   . finetune/extend homing missiles;
     . hitbox
     . initial position 
@@ -553,7 +551,7 @@ let update_view_size () =
   Game.Event.sink_eupd (`ViewResize (w, h))
 
 let render () =
-  let root = Dom_html.getElementById game_node_id in
+  let root = Dom_html.getElementById Constants.html_id in
   Dom.appendChild root reactive_view;
   Dom_html.document##.onkeydown := Dom_html.handler (fun e ->
     Printf.printf "keycode: %d\n" e##.keyCode;
