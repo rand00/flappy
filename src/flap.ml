@@ -436,46 +436,26 @@ let reactive_view : Dom.node Js.t =
           let extend = 100 in
           let style = 
             if entity.collided then
-              style_of_entity entity
-                ~extend
-                ~rotate:(`Deg 90)
-                "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
-            else 
-              style_of_entity entity
-                ~extend
-                "http://media.giphy.com/media/pU8F8SZnRc8mY/giphy.gif"
+              style_of_entity entity ~extend ~rotate:(`Deg 90) "assets/bird.gif"
+            else
+              style_of_entity entity ~extend "assets/bird.gif"
           in
           H.div ~a:[ H.a_style style ] []
         end
       | `Cookie ->
-        let style = style_of_entity entity
-            "https://proxy.duckduckgo.com/iu/?u=https%3A%2F%2F68.media.tumblr.\
-             com%2Fc9ed5ad2224ac3e259128282211bb967%2Ftumblr_oq0gpuyQ1U1wpimvfo1\
-             _500.png&f=1"
-            (* "https://proxy.duckduckgo.com/iu/?u=https%3A%2F%2Ftse3.mm.bing.net\
-             *  %2Fth%3Fid%3DOIP.h-BQl88HtAC9woJ2IGgZxQHaIM%26pid%3D15.1&f=1" *)
-        in
+        let style = style_of_entity entity "assets/milkshake.png" in
+        H.div ~a:[ H.a_style style ] []
+      | `Homing_missile _ ->
+        let style = style_of_entity entity "assets/chucky.png" in
         H.div ~a:[ H.a_style style ] []
       | `Wall ->
-        let style = style_of_entity entity
-            "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fs14.favim.\
-             com%2Forig%2F160524%2Fbts-fire-gif-suga-Favim.com-4339714.\
-             gif&f=1"
-        in
+        let style = style_of_entity entity "assets/korean.gif" in
         H.div ~a:[ H.a_style style ] []
-      (* "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2F\
-       *  www.hdwallback.net%2Fwp-content%2Fuploads%2F2017%2F12%2F\
-       *  brick-wallpapers-images.jpg&f=1" *)
       | `Background ->
-        let style = style_of_entity entity 
-            "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fhdwpro.com\
-             %2Fwp-content%2Fuploads%2F2016%2F03%2FNature-Amazing-\
-             Picture.jpeg&f=1"
-        in
+        let style = style_of_entity entity "assets/turtle_golf.jpeg" in
         H.div ~a:[ H.a_style style ] []
       | `Scoreboard score ->
-        let style = style_of_entity entity ""
-        in
+        let style = style_of_entity entity "" in
         let content = H.pcdata (sp "%d" score) in
         H.div ~a:[ H.a_style style ] [ content ]
     end
@@ -489,6 +469,7 @@ let reactive_view : Dom.node Js.t =
           | `Background -> "background"
           | `Scoreboard _ -> "scoreboard"
           | `Cookie -> "cookie"
+          | `Homing_missile _ -> "homing-missile"
         )
       in
       let background_color = "red" in
