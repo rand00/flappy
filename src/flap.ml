@@ -224,15 +224,20 @@ module Game = struct
       let move missile =
         match missile.typ with
         | `Homing_missile missile_data -> 
-          let movement_vector = match missile_data.target with
-            | None -> missile_data.movement_vector
-            | Some target ->
-              let target_vec = V2.v (float target.pos_x) (float target.pos_y) in
-              let missile_vec = V2.v (float missile.pos_x) (float missile.pos_y) in
-              let diff_vec = V2.(target_vec - missile_vec) in
-              let dist = V2.norm diff_vec in
-              let dist_factor = min (0.000014 *. sqrt dist) 0.5 in
-              V2.(missile_data.movement_vector + (dist_factor * diff_vec))
+          let movement_vector =
+            if missile.collided then
+              V2.v 0. 10.
+            else begin
+              match missile_data.target with
+              | None -> missile_data.movement_vector
+              | Some target ->
+                let target_vec = V2.v (float target.pos_x) (float target.pos_y) in
+                let missile_vec = V2.v (float missile.pos_x) (float missile.pos_y) in
+                let diff_vec = V2.(target_vec - missile_vec) in
+                let dist = V2.norm diff_vec in
+                let dist_factor = min (0.000014 *. sqrt dist) 0.5 in
+                V2.(missile_data.movement_vector + (dist_factor * diff_vec))
+            end
           in
           { missile with
             typ = `Homing_missile {
@@ -416,6 +421,7 @@ let game_model_s : Game.Model.t option React.signal =
         model.homing_missiles
         |> List.map (Game.Entity.Homing_missile.choose_target [model.bird])
         |> List.map Game.Entity.Homing_missile.move
+        |> List.map (Game.Entity.mark_if_collision model.walls)
         |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
         |> List.append (Game.Entity.Homing_missile.init frame dimensions) 
       in
