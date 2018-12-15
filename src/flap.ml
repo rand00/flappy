@@ -10,8 +10,9 @@ let fps = 30.
 
 (*goto game todo
   . finetune/extend homing missiles;
-    . death animation / explosion
-    . rotation of figure depending on direction
+    . make have timeout before death
+    . seems like doesn't get out of bounds? (or starts there)
+    . better missile model (not rectangle)
   . implement local multiplayer (bird v antimatter-bird)
   . experiment with a component structure using frp + vdom
   . performance; 
@@ -300,11 +301,13 @@ module Game = struct
       in
       List.exists is_collision_2d es
 
-    let mark_if_collision es e =
-      if not @@ collides es e then e else {
-        e with collided = true
-      }
-    
+    let mark_if_collision ?change es e =
+      if (not @@ collides es e) || e.collided then e else
+        let e = { e with collided = true } in
+        match change with
+        | Some change -> change e
+        | None -> e
+
   end
 
   module Model = struct
@@ -373,7 +376,10 @@ let game_model_s : Game.Model.t option React.signal =
         model.homing_missiles
         |> List.map (Game.Entity.Homing_missile.choose_target [model.bird])
         |> List.map Game.Entity.Homing_missile.move
-        |> List.map (Game.Entity.mark_if_collision model.walls)
+        |> List.map (
+          Game.Entity.mark_if_collision model.walls
+            ~change:(fun e -> { e with width = e.width + 100 })
+        )
         |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
         |> List.append (Game.Entity.Homing_missile.init frame dimensions) in
       let bird =
