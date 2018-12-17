@@ -34,6 +34,7 @@ let sp = Printf.sprintf
 (*> todo make a version of log that auto-prints newline*)
 let log = Printf.printf 
 let (%) f g x = f (g x)
+let (%>) f g x = g (f x)
 
 (* type entity_html = Html_types.body_content H.elt (\*possibly reactive*\) *)
 
@@ -89,6 +90,7 @@ module Game = struct
         pos_x : int;
         pos_y : int;
         collided : bool;
+        timeout : int option; (*n.o. frames*)
       }[@@deriving show]
   (*< todo remove id again if homing missiles doesn't need them*)
       
@@ -108,6 +110,7 @@ module Game = struct
       pos_x = (float view_w /. 4.) |> truncate;
       pos_y = (float view_h /. 2.) |> truncate;
       collided = false;
+      timeout = None;
     }
 
     let init_background (view_w, view_h) = {
@@ -117,6 +120,7 @@ module Game = struct
       pos_x = 0;
       pos_y = 0;
       collided = false;
+      timeout = None;
     }
 
     let init_wall frame (view_w, view_h) =
@@ -137,6 +141,7 @@ module Game = struct
             pos_x = view_w;
             pos_y = if Random.bool () then 0 else view_h - height;
             collided = false;
+            timeout = None;
           }
         ]
       )
@@ -159,6 +164,7 @@ module Game = struct
             pos_x;
             pos_y;
             collided = false;
+            timeout = None;
           }
         ]
       )
@@ -186,6 +192,7 @@ module Game = struct
               pos_x;
               pos_y;
               collided = false;
+              timeout = None;
             }
           ]
         )
@@ -244,6 +251,7 @@ module Game = struct
       pos_x = view_w - 150;
       pos_y = view_h - 80;
       collided = false;
+      timeout = None;
     }
 
     let increment_score s' e =
@@ -375,13 +383,19 @@ let game_model_s : Game.Model.t option React.signal =
         |> List.append (Game.Entity.init_wall frame dimensions) in
       let homing_missiles = 
         model.homing_missiles
-        |> List.map (Game.Entity.Homing_missile.choose_target [model.bird])
-        |> List.map Game.Entity.Homing_missile.move
         |> List.map (
-          Game.Entity.mark_if_collision (model.bird :: model.walls)
-            ~change:(fun e -> { e with width = e.width + 100 })
+             Game.Entity.Homing_missile.choose_target [model.bird]
+          %> Game.Entity.Homing_missile.move
+          %> (fun e -> { e with timeout = e.timeout |> CCOpt.map pred })
+          %> Game.Entity.mark_if_collision (model.bird :: model.walls)
+            ~change:(fun e -> {
+                  e with
+                  width = e.width + 100;
+                  timeout = Some (fps *. 3. |> truncate);
+                })
         )
-        |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
+        |> List.filter (not % fun e -> e.timeout |> CCOpt.exists (fun t -> t < 0))
+        |> List.filter (not % Game.Entity.is_out_of_bounds dimensions)
         |> List.append (Game.Entity.Homing_missile.init frame dimensions) in
       let bird =
         model.bird
