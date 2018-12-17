@@ -11,8 +11,9 @@ let fps = 30.
 (*goto game todo
   . finetune/extend homing missiles;
     . make have timeout before death
-    . seems like doesn't get out of bounds? (or starts there)
+    . explode on collide with bird
     . better missile model (not rectangle)
+    . seems like doesn't get out of bounds? (or starts there)
   . implement local multiplayer (bird v antimatter-bird)
   . experiment with a component structure using frp + vdom
   . performance; 
@@ -377,7 +378,7 @@ let game_model_s : Game.Model.t option React.signal =
         |> List.map (Game.Entity.Homing_missile.choose_target [model.bird])
         |> List.map Game.Entity.Homing_missile.move
         |> List.map (
-          Game.Entity.mark_if_collision model.walls
+          Game.Entity.mark_if_collision (model.bird :: model.walls)
             ~change:(fun e -> { e with width = e.width + 100 })
         )
         |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
