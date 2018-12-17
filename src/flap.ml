@@ -9,11 +9,6 @@ let debug = false
 let fps = 30.
 
 (*goto game todo
-  . finetune/extend homing missiles;
-    . make have timeout before death
-    . explode on collide with bird
-    . better missile model (not rectangle)
-    . seems like doesn't get out of bounds? (or starts there)
   . implement local multiplayer (bird v antimatter-bird)
   . experiment with a component structure using frp + vdom
   . performance; 
@@ -510,7 +505,7 @@ let reactive_view : Dom.node Js.t =
             if entity.collided then
               "assets/explosion.gif", 60
             else
-              "assets/blue_flame.gif", 20
+              "assets/doggy.png", 120
           in
           style_of_entity entity image  ~extend
         in
