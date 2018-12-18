@@ -12,8 +12,6 @@ let players = 2
 (*goto game todo
   . !idea; missiles; make target eachother too! (+ tune attraction (up it?))
   . finetune local multiplayer (bird v antimatter-bird)
-    . diff colors birds
-    . scoreboard visible
     . make missiles remove points instead 
     . up the points given for milkshakes?
       . make them move in patterns
@@ -257,10 +255,10 @@ module Game = struct
     
     let init_scoreboard (view_w, view_h) = {
       typ = `Scoreboard IMap.empty;
-      width = 0;
+      width = 550;
       height = 0;
-      pos_x = view_w - 150;
-      pos_y = view_h - 80;
+      pos_x = view_w - 283;
+      pos_y = view_h - (80 * players);
       collided = false;
       timeout = None;
     }
@@ -516,9 +514,10 @@ let style_of_entity
       Style.left @@ `Px pos_x;
       Style.top @@ `Px pos_y;
       Style.font_family `Courier_new;
-      Style.font_size @@ `Px 80;
-      (let px = `Px 2 in Style.text_shadow px px px "rgb(52, 0, 85)");
-      Style.color "rgb(52, 0, 85)";
+      Style.font_size @@ `Px 40;
+      Style.text_shadow (`Px 80) (`Px 19) (`Px 2) "rgb(52, 0, 85)";
+      Style.color "rgb(102, 255, 125)";
+      Style.line_height @@ `Px 25;
     ]
       @ (filter |> CCOpt.map Style.filter |> CCOpt.to_list)
       @ (rotate |> CCOpt.map Style.rotate |> CCOpt.to_list)
@@ -531,7 +530,6 @@ let reactive_view : Dom.node Js.t =
   let render_game_entity entity =
     begin match entity.typ with
       | `Bird player ->
-        (*goto goo color playerbirds differently*)
         begin
           let extend = 100 in
           let hue_rotate_degrees =
@@ -573,7 +571,7 @@ let reactive_view : Dom.node Js.t =
             score
             |> IMap.bindings
             |> CCList.flat_map (fun (player, score) -> 
-                   let content = H.pcdata (sp "Player-%d score = %d" player score) in
+                   let content = H.pcdata (sp "Flap%d: %d" player score) in
                    [
                      H.div [ content ];
                      H.br ();

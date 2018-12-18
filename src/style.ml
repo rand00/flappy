@@ -23,6 +23,8 @@ let dist = function
 let width d = sp "width: %s" (dist d)
 let heigth d = sp "height: %s" (dist d)
 
+let line_height d = sp "line-height: %s" (dist d)
+
 let left d = sp "left: %s" (dist d)
 let top d = sp "top: %s" (dist d)
 let bottom d = sp "bottom: %s" (dist d)
@@ -46,3 +48,4 @@ let color color = sp "color: %s" color
 (* https://www.w3schools.com/CSSref/css3_pr_filter.asp *)
 let filter = function
   | `Hue_rotate deg -> sp "filter: hue-rotate(%ddeg)" deg
+
