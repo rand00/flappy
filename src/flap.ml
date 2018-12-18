@@ -7,6 +7,7 @@ module R = Tyxml_js.R.Html
 
 let debug = false
 let fps = 30.
+let players = 2
 
 (*goto game todo
   . implement local multiplayer (bird v antimatter-bird)
@@ -31,6 +32,8 @@ let log = Printf.printf
 let (%) f g x = f (g x)
 let (%>) f g x = g (f x)
 
+module IMap = CCMap.Make(CCInt)
+      
 (* type entity_html = Html_types.body_content H.elt (\*possibly reactive*\) *)
 
 module Game = struct
@@ -38,7 +41,7 @@ module Game = struct
   module Event = struct
 
     type t = [
-      | `WingFlap
+      | `WingFlap of int 
       | `Frame of int
       | `ViewResize of int * int
     ]
@@ -70,10 +73,10 @@ module Game = struct
       }[@@deriving show]
       
       and typ = [
-        | `Bird
+        | `Bird of int (*player no.*)
         | `Wall
         | `Background
-        | `Scoreboard of int
+        | `Scoreboard of (int IMap.t [@printer IMap.pp CCInt.pp CCInt.pp])
         | `Cookie
         | `Homing_missile of homing_missile
       ][@@deriving show]
@@ -98,12 +101,12 @@ module Game = struct
       let x', y' = float e'.pos_x, float e'.pos_y in
       sqrt ((x -. x') ** 2. +. (y -. y') ** 2.)
     
-    let init_bird (view_w, view_h) = {
-      typ = `Bird;
+    let init_bird (view_w, view_h) i = {
+      typ = `Bird i;
       width = 30;
       height = 30;
       pos_x = (float view_w /. 4.) |> truncate;
-      pos_y = (float view_h /. 2.) |> truncate;
+      pos_y = (float (i * view_h) /. (float players)) |> truncate;
       collided = false;
       timeout = None;
     }
@@ -240,7 +243,7 @@ module Game = struct
     end
     
     let init_scoreboard (view_w, view_h) = {
-      typ = `Scoreboard 0;
+      typ = `Scoreboard IMap.empty;
       width = 0;
       height = 0;
       pos_x = view_w - 150;
@@ -249,11 +252,18 @@ module Game = struct
       timeout = None;
     }
 
-    let increment_score s' e =
-      match e.typ with
-      | `Scoreboard s -> { e with typ = `Scoreboard (s + s') }
+    let increment_score ~scored_now ~bird e =
+      match e.typ, bird.typ with
+      | `Scoreboard scores, `Bird player ->
+        let scores =
+          scores |> IMap.update player (function
+              | None -> Some scored_now
+              | Some score -> Some (scored_now + score)
+            )
+        in
+        { e with typ = `Scoreboard scores }
       | typ ->
-        log "this was not a scoreboard!\n";
+        log "this was not a scoreboard+bird !\n";
         e 
 
     let move_x px e = {
@@ -319,7 +329,7 @@ module Game = struct
     module T = struct 
     
       type t = {
-        bird : Entity.t;
+        birds : Entity.t list;
         walls : Entity.t list;
         cookies : Entity.t list;
         homing_missiles : Entity.t list;
@@ -335,13 +345,13 @@ module Game = struct
       [ m.background ];
       m.walls;
       m.cookies;
-      [ m.bird ];
+      m.birds;
       m.homing_missiles;
       [ m.scoreboard ];
     ]
     
     let init view_dimensions = {
-      bird = Entity.init_bird view_dimensions;
+      birds = List.init players (Entity.init_bird view_dimensions);
       walls = [];
       cookies = [];
       homing_missiles = [];
@@ -361,14 +371,21 @@ open Game.Model.T
 let game_model_s : Game.Model.t option React.signal = 
   let update model event =
     match event with
-    | `WingFlap ->
-      let bird =
-        if model.bird.collided then model.bird else 
-          model.bird
-          |> Game.Entity.move_y (-70)
-          |> Game.Entity.mark_if_collision (model.walls @ model.homing_missiles)
+    | `WingFlap player ->
+      let birds =
+        model.birds 
+        |> List.map (fun bird -> 
+            if bird.collided then bird else 
+              match bird.typ with
+              | `Bird bird_player when bird_player = player -> 
+                bird
+                |> Game.Entity.move_y (-70)
+                |> Game.Entity.mark_if_collision
+                  (model.walls @ model.homing_missiles)
+              | _ -> bird
+          )
       in
-      { model with bird }
+      { model with birds }
     | `Frame frame ->
       let dimensions = model.background.width, model.background.height in
       let walls =
@@ -379,10 +396,10 @@ let game_model_s : Game.Model.t option React.signal =
       let homing_missiles = 
         model.homing_missiles
         |> List.map (
-             Game.Entity.Homing_missile.choose_target [model.bird]
+             Game.Entity.Homing_missile.choose_target model.birds
           %> Game.Entity.Homing_missile.move
           %> (fun e -> { e with timeout = e.timeout |> CCOpt.map pred })
-          %> Game.Entity.mark_if_collision (model.bird :: model.walls)
+          %> Game.Entity.mark_if_collision (model.birds @ model.walls)
             ~change:(fun e -> {
                   e with
                   width = e.width + 100;
@@ -392,10 +409,14 @@ let game_model_s : Game.Model.t option React.signal =
         |> List.filter (not % fun e -> e.timeout |> CCOpt.exists (fun t -> t < 0))
         |> List.filter (not % Game.Entity.is_out_of_bounds dimensions)
         |> List.append (Game.Entity.Homing_missile.init frame dimensions) in
-      let bird =
-        model.bird
-        |> Game.Entity.move_y 11
-        |> Game.Entity.mark_if_collision (walls @ homing_missiles) in
+      let birds =
+        model.birds
+        |> List.map (fun bird ->
+            bird 
+            |> Game.Entity.move_y 11
+            |> Game.Entity.mark_if_collision (walls @ homing_missiles) 
+          )
+      in
       let scoreboard, cookies =
         let cookies =
           model.cookies
@@ -404,19 +425,25 @@ let game_model_s : Game.Model.t option React.signal =
           *)
           |> List.map (Game.Entity.move_x (-10))
           |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
-          |> List.append (Game.Entity.init_cookie frame dimensions) in
-        let cookies_left = 
-          cookies
-          |> List.filter (not % Game.Entity.collides [bird]) in
-        let scored_now = List.(length cookies - length cookies_left) in
-        let scoreboard =
-          model.scoreboard
-          |> Game.Entity.increment_score scored_now
+          |> List.append (Game.Entity.init_cookie frame dimensions)
         in
-        scoreboard, cookies_left 
+        model.birds
+        |> List.fold_left (fun (scoreboard, cookies) bird -> 
+            let cookies_left = 
+              cookies
+              |> List.filter (not % Game.Entity.collides [bird])
+            in
+            let scored_now = List.(length cookies - length cookies_left) in
+            let scoreboard = Game.Entity.increment_score
+                ~scored_now
+                ~bird
+                scoreboard
+            in
+            scoreboard, cookies_left
+          ) (model.scoreboard, cookies)
       in
       {
-        bird;
+        birds;
         walls;
         cookies;
         homing_missiles;
@@ -428,7 +455,7 @@ let game_model_s : Game.Model.t option React.signal =
       let reposition e =
         Game.Entity.reposition prev_dimensions dimensions e
       in
-      let bird = model.bird |> reposition in
+      let birds = model.birds |> List.map reposition in
       let walls = model.walls |> List.map reposition in
       let cookies = model.cookies |> List.map reposition in
       let homing_missiles = model.homing_missiles |> List.map reposition in
@@ -436,7 +463,7 @@ let game_model_s : Game.Model.t option React.signal =
       let background = model.background |> Game.Entity.resize dimensions 
       in
       {
-        bird;
+        birds;
         walls;
         background;
         homing_missiles;
@@ -485,7 +512,8 @@ let style_of_entity
 let reactive_view : Dom.node Js.t =
   let render_game_entity entity =
     begin match entity.typ with
-      | `Bird ->
+      | `Bird player ->
+        (*goto goo color playerbirds differently*)
         begin
           let extend = 100 in
           let style = 
@@ -518,15 +546,24 @@ let reactive_view : Dom.node Js.t =
         H.div ~a:[ H.a_style style ] []
       | `Scoreboard score ->
         let style = style_of_entity entity "" in
-        let content = H.pcdata (sp "%d" score) in
-        H.div ~a:[ H.a_style style ] [ content ]
+        H.div ~a:[ H.a_style style ] (
+            score
+            |> IMap.bindings
+            |> CCList.flat_map (fun (player, score) -> 
+                   let content = H.pcdata (sp "Player-%d score = %d" player score) in
+                   [
+                     H.div [ content ];
+                     H.br ();
+                   ]
+                 )
+          )
     end
   in
   let render_debug_overlay entity =
     if not debug then H.div [] else (
       let debug_text = H.pcdata (
           match entity.typ with
-          | `Bird -> "bird"
+          | `Bird _ -> "bird"
           | `Wall -> "wall"
           | `Background -> "background"
           | `Scoreboard _ -> "scoreboard"
@@ -537,7 +574,7 @@ let reactive_view : Dom.node Js.t =
       let background_color = "red" in
       let z_index =
         let put_hitbox_on_top = match entity.typ with
-          | `Bird | `Cookie | `Homing_missile _ -> true
+          | `Bird _ | `Cookie | `Homing_missile _ -> true
           | _ -> false
         in
         if put_hitbox_on_top then 1 else -1
@@ -587,7 +624,9 @@ let init_game () =
   Dom_html.document##.onkeydown := Dom_html.handler (fun e ->
     Printf.printf "keycode: %d\n" e##.keyCode;
     let _ = match e##.keyCode with
-      | 32 -> Game.Event.sink_eupd `WingFlap
+      (* 32 = space*)
+      | 87 (*w*) ->        Game.Event.sink_eupd (`WingFlap 0) 
+      | 38 (*arrow-up*) -> Game.Event.sink_eupd (`WingFlap 1)
       | _ -> ()
     in
     Js._true
