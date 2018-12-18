@@ -10,7 +10,6 @@ let fps = 30.
 let players = 2
 
 (*goto game todo
-  . !idea; missiles; make target eachother too! (+ tune attraction (up it?))
   . finetune local multiplayer (bird v antimatter-bird)
     . make birds 
       . able to move down + right/left?
@@ -56,7 +55,7 @@ module Game = struct
   module Event = struct
 
     type t = [
-      | `WingFlap of int 
+      | `WingFlap of int (*player*) * [ `Left | `Right | `Up | `Down ]
       | `Frame of int
       | `ViewResize of int * int
     ]
@@ -391,7 +390,14 @@ open Game.Model.T
 let game_model_s : Game.Model.t option React.signal = 
   let update model event =
     match event with
-    | `WingFlap player ->
+    | `WingFlap (player, direction) ->
+      let px = 140 in
+      let x, y = match direction with
+        | `Left  -> -px, 0
+        | `Right ->  px, 0
+        | `Up    ->   0, -px
+        | `Down  ->   0,  px
+      in
       let birds =
         model.birds 
         |> List.map (fun bird -> 
@@ -400,7 +406,8 @@ let game_model_s : Game.Model.t option React.signal =
                       bird_player = player
                       && not bird.collided -> 
                   bird
-                  |> Game.Entity.move_y (-70)
+                  |> Game.Entity.move_x x
+                  |> Game.Entity.move_y y
                   |> Game.Entity.mark_if_collision
                        (model.walls @ model.homing_missiles)
                | _ -> bird
@@ -652,9 +659,20 @@ let init_game () =
   Dom_html.document##.onkeydown := Dom_html.handler (fun e ->
     Printf.printf "keycode: %d\n" e##.keyCode;
     let _ = match e##.keyCode with
-      (* 32 = space*)
-      | 87 (*w*) ->        Game.Event.sink_eupd (`WingFlap 0) 
-      | 38 (*arrow-up*) -> Game.Event.sink_eupd (`WingFlap 1)
+      | 87 (*w*) -> Game.Event.sink_eupd (`WingFlap (0, `Up)) 
+      | 65 (*a*) -> Game.Event.sink_eupd (`WingFlap (0, `Left)) 
+      | 83 (*s*) -> Game.Event.sink_eupd (`WingFlap (0, `Down)) 
+      | 68 (*d*) -> Game.Event.sink_eupd (`WingFlap (0, `Right)) 
+
+      | 38 (*arrow-up*)    -> Game.Event.sink_eupd (`WingFlap (1, `Up))
+      | 37 (*arrow-left*)  -> Game.Event.sink_eupd (`WingFlap (1, `Left))
+      | 40 (*arrow-down*)  -> Game.Event.sink_eupd (`WingFlap (1, `Down))
+      | 39 (*arrow-right*) -> Game.Event.sink_eupd (`WingFlap (1, `Right))
+
+      | 73 (*i*) -> Game.Event.sink_eupd (`WingFlap (2, `Up))
+      | 74 (*j*) -> Game.Event.sink_eupd (`WingFlap (2, `Left))
+      | 75 (*k*) -> Game.Event.sink_eupd (`WingFlap (2, `Down))
+      | 76 (*l*) -> Game.Event.sink_eupd (`WingFlap (2, `Right))
       | _ -> ()
     in
     Js._true
