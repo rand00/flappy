@@ -12,6 +12,10 @@ let players = 2
 (*goto game todo
   . !idea; missiles; make target eachother too! (+ tune attraction (up it?))
   . finetune local multiplayer (bird v antimatter-bird)
+    . make birds 
+      . able to move down + right/left?
+      . and should be enough to press key up/down repeatedly
+    . add 3rd player controls (n/space or i/j/k/l)
     . make missiles remove points instead 
     . up the points given for milkshakes?
       . make them move in patterns
@@ -432,16 +436,16 @@ let game_model_s : Game.Model.t option React.signal =
             |> Game.Entity.mark_if_collision (walls @ homing_missiles) 
           )
       in
+      let cookies =
+        model.cookies
+        (*goto could map 'apply_movement' here instead, which should be saved pr. entity
+          < should also include the info about who's being followed?
+        *)
+        |> List.map (Game.Entity.move_x (-10))
+        |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
+        |> List.append (Game.Entity.init_cookie frame dimensions)
+      in
       let scoreboard, cookies =
-        let cookies =
-          model.cookies
-          (*goto could map 'apply_movement' here instead, which should be saved pr. entity
-            < should also include the info about who's being followed?
-          *)
-          |> List.map (Game.Entity.move_x (-10))
-          |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
-          |> List.append (Game.Entity.init_cookie frame dimensions)
-        in
         model.birds
         |> List.fold_left (fun (scoreboard, cookies) bird -> 
             let cookies_left = 
