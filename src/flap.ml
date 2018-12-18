@@ -410,6 +410,9 @@ let game_model_s : Game.Model.t option React.signal =
       let homing_missiles = 
         model.homing_missiles
         |> List.map (
+               (*goto goo try add missiles as targets too
+                 . keep logic internal to choose-target, as there can be more complex priorities
+                *)
              Game.Entity.Homing_missile.choose_target model.birds
           %> Game.Entity.Homing_missile.move
           %> (fun e -> { e with timeout = e.timeout |> CCOpt.map pred })
@@ -493,7 +496,7 @@ let game_model_s : Game.Model.t option React.signal =
 (**View*)
 
 let style_of_entity
-    ?rotate ?extend ?background_color ?z_index 
+    ?rotate ?extend ?background_color ?z_index ?filter
     entity image
   =
   let ext = CCOpt.get_or ~default:0 extend in
@@ -505,22 +508,23 @@ let style_of_entity
     entity.pos_y - ext
   in
   Style.make ([
-    Style.position `Fixed;
-    Style.background_image image;
-    Style.background_size `Cover;
-    Style.width @@ `Px width;
-    Style.heigth @@ `Px height;
-    Style.left @@ `Px pos_x;
-    Style.top @@ `Px pos_y;
-    Style.font_family `Courier_new;
-    Style.font_size @@ `Px 80;
-    (let px = `Px 2 in Style.text_shadow px px px "rgb(52, 0, 85)");
-    Style.color "rgb(52, 0, 85)";
-  ]
-    @ (rotate |> CCOpt.map Style.rotate |> CCOpt.to_list)
-    @ (background_color |> CCOpt.map Style.background_color |> CCOpt.to_list)
-    @ (z_index |> CCOpt.map Style.z_index |> CCOpt.to_list)
-  )
+      Style.position `Fixed;
+      Style.background_image image;
+      Style.background_size `Cover;
+      Style.width @@ `Px width;
+      Style.heigth @@ `Px height;
+      Style.left @@ `Px pos_x;
+      Style.top @@ `Px pos_y;
+      Style.font_family `Courier_new;
+      Style.font_size @@ `Px 80;
+      (let px = `Px 2 in Style.text_shadow px px px "rgb(52, 0, 85)");
+      Style.color "rgb(52, 0, 85)";
+    ]
+      @ (filter |> CCOpt.map Style.filter |> CCOpt.to_list)
+      @ (rotate |> CCOpt.map Style.rotate |> CCOpt.to_list)
+      @ (background_color |> CCOpt.map Style.background_color |> CCOpt.to_list)
+      @ (z_index |> CCOpt.map Style.z_index |> CCOpt.to_list)
+    )
 
 (*old type: Html_types.body_content H.elt list S.t*)
 let reactive_view : Dom.node Js.t =
@@ -530,11 +534,16 @@ let reactive_view : Dom.node Js.t =
         (*goto goo color playerbirds differently*)
         begin
           let extend = 100 in
+          let hue_rotate_degrees =
+            360. *. (float player) /. (float players) |> truncate in
+          let filter = `Hue_rotate hue_rotate_degrees in
           let style = 
             if entity.collided then
-              style_of_entity entity ~extend ~rotate:(`Deg 90) "assets/bird.gif"
+              style_of_entity entity
+                ~extend ~filter ~rotate:(`Deg 90) "assets/bird.gif"
             else
-              style_of_entity entity ~extend "assets/bird.gif"
+              style_of_entity entity
+                ~extend ~filter "assets/bird.gif"
           in
           H.div ~a:[ H.a_style style ] []
         end

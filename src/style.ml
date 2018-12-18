@@ -42,3 +42,7 @@ let text_shadow d0 d1 d2 color =
   sp "text-shadow: %s %s %s %s" (dist d0) (dist d1) (dist d2) color
 
 let color color = sp "color: %s" color 
+
+(* https://www.w3schools.com/CSSref/css3_pr_filter.asp *)
+let filter = function
+  | `Hue_rotate deg -> sp "filter: hue-rotate(%ddeg)" deg
