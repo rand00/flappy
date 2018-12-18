@@ -185,10 +185,9 @@ module Game = struct
     module Homing_missile = struct 
     
       let init frame (view_w, view_h) =
-        let dist_mul = 3. in
         let time_to_spawn =
-          frame mod truncate (fps *. dist_mul) = 0
-          && Random.float 1.0 < (0.2 *. dist_mul)
+          frame mod truncate (fps *. 0.5) = 0
+          && Random.float 1.0 < (1. /. 4.)
         in
         if not time_to_spawn then [] else (
           let width = 30
@@ -214,10 +213,15 @@ module Game = struct
         let target =
           List.fold_left (fun acc e ->
               match acc with
-              | None -> Some e
+              | None -> if distance missile e > 0.1 then Some e else None
               | Some e' ->
                 let chosen =
-                  if distance missile e < distance missile e' then e else e'
+                  let dist_e, dist_e' = distance missile e, distance missile e' in
+                  if
+                    dist_e < dist_e' &&
+                    dist_e > 0.1 (*to avoid itself*)
+                  then e
+                  else e'
                 in Some chosen
             ) None targets
         in
@@ -244,7 +248,8 @@ module Game = struct
                 let missile_vec = V2.v (float missile.pos_x) (float missile.pos_y) in
                 let diff_vec = V2.(target_vec - missile_vec) in
                 let dist = V2.norm diff_vec in
-                let dist_factor = min (0.000014 *. sqrt dist) 0.5 in
+                (* let dist_factor = min (0.000030 *. sqrt dist) 0.1 in *)
+                let dist_factor = min 0.1 0.003 in
                 V2.(missile_data.movement_vector + (dist_factor * diff_vec))
             end
           in
@@ -412,10 +417,8 @@ let game_model_s : Game.Model.t option React.signal =
       let homing_missiles = 
         model.homing_missiles
         |> List.map (
-               (*goto goo try add missiles as targets too
-                 . keep logic internal to choose-target, as there can be more complex priorities
-                *)
-             Game.Entity.Homing_missile.choose_target model.birds
+          Game.Entity.Homing_missile.choose_target
+            (model.birds @ model.homing_missiles)
           %> Game.Entity.Homing_missile.move
           %> (fun e -> { e with timeout = e.timeout |> CCOpt.map pred })
           %> Game.Entity.mark_if_collision (model.birds @ model.walls)
