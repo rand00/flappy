@@ -388,15 +388,16 @@ let game_model_s : Game.Model.t option React.signal =
       let birds =
         model.birds 
         |> List.map (fun bird -> 
-            if bird.collided then bird else 
-              match bird.typ with
-              | `Bird bird_player when bird_player = player -> 
-                bird
-                |> Game.Entity.move_y (-70)
-                |> Game.Entity.mark_if_collision
-                  (model.walls @ model.homing_missiles)
-              | _ -> bird
-          )
+               match bird.typ with
+               | `Bird bird_player when
+                      bird_player = player
+                      && not bird.collided -> 
+                  bird
+                  |> Game.Entity.move_y (-70)
+                  |> Game.Entity.mark_if_collision
+                       (model.walls @ model.homing_missiles)
+               | _ -> bird
+             )
       in
       { model with birds }
     | `Frame frame ->
