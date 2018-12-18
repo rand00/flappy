@@ -10,8 +10,21 @@ let fps = 30.
 let players = 2
 
 (*goto game todo
-  . implement local multiplayer (bird v antimatter-bird)
+  . !idea; missiles; make target eachother too! (+ tune attraction (up it?))
+  . finetune local multiplayer (bird v antimatter-bird)
+    . diff colors birds
+    . scoreboard visible
+    . make missiles remove points instead 
+    . up the points given for milkshakes?
+      . make them move in patterns
+    . make birds interact?
   . experiment with a component structure using frp + vdom
+    . could be used for animation/visualization
+      . so inner state is a fix/fold over item state
+      . ideas;
+        . e.g. implement a trail of following feathers of birds 
+          (better to be own entities? - for recursive interaction with env.)
+        . explosion material flying out (might be better to be own entities..)
   . performance; 
     . check if wanna use request animation-frame? 
       > then would need time-diff to simulate instead - less simple..
