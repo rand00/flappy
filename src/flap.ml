@@ -10,12 +10,11 @@ let fps = 30.
 let players = 2
 
 (*goto game todo
+  . finetune movement of birds; 
   . finetune local multiplayer (bird v antimatter-bird)
-    . make birds 
-      . able to move down + right/left?
-      . and should be enough to press key up/down repeatedly
-    . add 3rd player controls (n/space or i/j/k/l)
-    . make missiles remove points instead 
+    . make doggies prioritize birds relative to distance
+      . want a mechanic where a pack of dogs will follow a bird
+    . make doggies remove points instead 
     . up the points given for milkshakes?
       . make them move in patterns
     . make birds interact?
@@ -85,9 +84,14 @@ module Game = struct
         target : t option;
         movement_vector : V2.t;
       }[@@deriving show]
+
+      and bird = {
+        player : int;
+        movement_vector : V2.t;
+      }[@@deriving show]
       
       and typ = [
-        | `Bird of int (*player no.*)
+        | `Bird of bird
         | `Wall
         | `Background
         | `Scoreboard of (int IMap.t [@printer IMap.pp CCInt.pp CCInt.pp])
@@ -104,7 +108,8 @@ module Game = struct
         collided : bool;
         timeout : int option; (*n.o. frames*)
       }[@@deriving show]
-  (*< todo remove id again if homing missiles doesn't need them*)
+
+      (*< todo remove id again if homing missiles doesn't need them*)
       
     end
 
@@ -114,16 +119,52 @@ module Game = struct
       let x , y  = float e.pos_x, float e.pos_y in
       let x', y' = float e'.pos_x, float e'.pos_y in
       sqrt ((x -. x') ** 2. +. (y -. y') ** 2.)
-    
-    let init_bird (view_w, view_h) i = {
-      typ = `Bird i;
-      width = 30;
-      height = 30;
-      pos_x = (float view_w /. 4.) |> truncate;
-      pos_y = (float (i * view_h) /. (float players)) |> truncate;
-      collided = false;
-      timeout = None;
-    }
+
+    module Bird = struct 
+
+      let init (view_w, view_h) i = {
+        typ = `Bird { player = i; movement_vector = V2.v 0. 0. };
+        width = 30;
+        height = 30;
+        pos_x = (float view_w /. 4.) |> truncate;
+        pos_y = (float (i * view_h) /. (float players)) |> truncate;
+        collided = false;
+        timeout = None;
+      }
+
+      let move direction bird =
+        match bird.typ with
+        | `Bird bird_data ->
+          let fall_vector = V2.v 0. 11. in
+          let slowdown = 0.9 in
+          let movement_vector =
+            if bird.collided then
+              fall_vector
+            else begin
+              match direction with
+              | None -> V2.(slowdown * bird_data.movement_vector)
+              | Some direction -> (*goo*)
+                let direction_vec = match direction with
+                  | `Up    -> V2.v    0. (-70.)
+                  | `Down  -> V2.v    0.   35.
+                  | `Left  -> V2.v (-35.)   0.
+                  | `Right -> V2.v   35.    0.
+                in
+                let movement_vec =
+                  V2.(bird_data.movement_vector + direction_vec)
+                in
+                V2.(slowdown * movement_vec)
+            end
+          in
+          let final_vector = V2.(movement_vector + fall_vector) in
+          { bird with
+            typ = `Bird { bird_data with movement_vector };
+            pos_x = bird.pos_x + (truncate V2.(x final_vector));
+            pos_y = bird.pos_y + (truncate V2.(y final_vector));
+          }
+        | _ -> bird (*goto make 'log_and_return "tag" entity' a helper *)
+
+    end
 
     let init_background (view_w, view_h) = {
       typ = `Background;
@@ -246,9 +287,9 @@ module Game = struct
                 let target_vec = V2.v (float target.pos_x) (float target.pos_y) in
                 let missile_vec = V2.v (float missile.pos_x) (float missile.pos_y) in
                 let diff_vec = V2.(target_vec - missile_vec) in
-                let dist = V2.norm diff_vec in
+                (* let dist = V2.norm diff_vec in *)
                 (* let dist_factor = min (0.000030 *. sqrt dist) 0.1 in *)
-                let dist_factor = min 0.1 0.003 in
+                let dist_factor = 0.003 in
                 V2.(missile_data.movement_vector + (dist_factor * diff_vec))
             end
           in
@@ -273,7 +314,7 @@ module Game = struct
 
     let increment_score ~scored_now ~bird e =
       match e.typ, bird.typ with
-      | `Scoreboard scores, `Bird player ->
+      | `Scoreboard scores, `Bird {player} ->
         let scores =
           scores |> IMap.update player (function
               | None -> Some scored_now
@@ -370,7 +411,7 @@ module Game = struct
     ]
     
     let init view_dimensions = {
-      birds = List.init players (Entity.init_bird view_dimensions);
+      birds = List.init players (Entity.Bird.init view_dimensions);
       walls = [];
       cookies = [];
       homing_missiles = [];
@@ -391,23 +432,15 @@ let game_model_s : Game.Model.t option React.signal =
   let update model event =
     match event with
     | `WingFlap (player, direction) ->
-      let px = 140 in
-      let x, y = match direction with
-        | `Left  -> -px, 0
-        | `Right ->  px, 0
-        | `Up    ->   0, -px
-        | `Down  ->   0,  px
-      in
       let birds =
         model.birds 
         |> List.map (fun bird -> 
                match bird.typ with
                | `Bird bird_player when
-                      bird_player = player
+                      bird_player.player = player
                       && not bird.collided -> 
                   bird
-                  |> Game.Entity.move_x x
-                  |> Game.Entity.move_y y
+                  |> (Game.Entity.Bird.move (Some direction))
                   |> Game.Entity.mark_if_collision
                        (model.walls @ model.homing_missiles)
                | _ -> bird
@@ -442,7 +475,7 @@ let game_model_s : Game.Model.t option React.signal =
         model.birds
         |> List.map (fun bird ->
             bird 
-            |> Game.Entity.move_y 11
+            |> Game.Entity.Bird.move None
             |> Game.Entity.mark_if_collision (walls @ homing_missiles) 
           )
       in
@@ -543,7 +576,7 @@ let style_of_entity
 let reactive_view : Dom.node Js.t =
   let render_game_entity entity =
     begin match entity.typ with
-      | `Bird player ->
+      | `Bird {player} ->
         begin
           let extend = 100 in
           let hue_rotate_degrees =
