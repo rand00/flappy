@@ -10,14 +10,20 @@ let fps = 30.
 let players = 2
 
 (*goto game todo
-  . finetune movement of birds; 
   . finetune local multiplayer (bird v antimatter-bird)
-    . make doggies prioritize birds relative to distance
-      . want a mechanic where a pack of dogs will follow a bird
-    . make doggies remove points instead 
-    . up the points given for milkshakes?
-      . make them move in patterns
+    . add 'lives' for birds (room for mistakes)
+    . ? make doggies remove points instead (-1)
+      . like that one is nervous because of dogs - less so if just removing points
+        > both remove 1 point + 1 life
+    . up the points given for milkshakes? (+5)
+    . make milkshakes move in patterns?
     . make birds interact?
+      . idea; action good for all birds;
+        . respawning a lost bird
+        . explosion pushing away doggies
+        . giving more health to birds
+  . visuals;
+    . prettier walls
   . experiment with a component structure using frp + vdom
     . could be used for animation/visualization
       . so inner state is a fix/fold over item state
@@ -33,10 +39,14 @@ let players = 2
     . could this be a general entity thing? to have an animation-spec 
       < try to avoid a function here
   . make it more fun to move around 
-    . idea; have 'holes in walls' instead of just pillars
-    . idea; move left/right too?
+    . idea; have harder to move-through 'puzzles' e.g. 
+      . turning pillars
+      . holes in walls
+      . timing based walls [laser-beam; .. ]
     . idea; more interesting physics
       . idea; bouncing on walls instead of dying
+  . elena idea;
+    . bosses when having reached a certain number of points
 *)
 
 let sp = Printf.sprintf
@@ -109,8 +119,6 @@ module Game = struct
         timeout : int option; (*n.o. frames*)
       }[@@deriving show]
 
-      (*< todo remove id again if homing missiles doesn't need them*)
-      
     end
 
     include T
@@ -143,7 +151,7 @@ module Game = struct
             else begin
               match direction with
               | None -> V2.(slowdown * bird_data.movement_vector)
-              | Some direction -> (*goo*)
+              | Some direction -> 
                 let direction_vec = match direction with
                   | `Up    -> V2.v    0. (-70.)
                   | `Down  -> V2.v    0.   35.
@@ -255,14 +263,18 @@ module Game = struct
               match acc with
               | None -> if distance missile e > 0.1 then Some e else None
               | Some e' ->
-                let chosen =
-                  let dist_e, dist_e' = distance missile e, distance missile e' in
-                  if
-                    dist_e < dist_e' &&
-                    dist_e > 0.1 (*to avoid itself*)
-                  then e
-                  else e'
-                in Some chosen
+                 let factor e = match e.typ with
+                   | `Bird _ -> 0.6 | _ -> 1.
+                 in
+                 let chosen =
+                   let dist_e, dist_e' = distance missile e, distance missile e' in
+                   let prio_e, prio_e' = factor e, factor e' in
+                   if
+                     prio_e *. dist_e < prio_e' *. dist_e' &&
+                       dist_e > 0.1 (*to avoid itself*)
+                   then e
+                   else e'
+                 in Some chosen
             ) None targets
         in
         match missile.typ with
