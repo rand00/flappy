@@ -29,4 +29,10 @@ problems. E.g. homing missiles.
 * See the needed dependencies in the `_tags` file - use `opam` to install them.
 * Run `./compile.sh` which generates an `webout/index.html` and `webout/flap.js`.
 * Open `webout/index.html` in your favorite browser
-* Use spacebar to fly
+* Use w/a/s/d + i/j/k/l + arrow-keys to fly (depending on the value of `players` in `flap.ml`)
+
+### Updates
+* Added local multiplayer
+* Added smoot multi-directional vector-based movement
+* Added homing dogs 
+* ... 
