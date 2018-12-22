@@ -1,4 +1,4 @@
-true: include
+true: include, warn(-30)
 
 true: package(ppx_deriving.std)
 true: package(gg, vg, containers, js_of_ocaml-tyxml, reactiveData)

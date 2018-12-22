@@ -4,7 +4,10 @@ open ReactiveData
 open Gg
 module H = Tyxml_js.Html
 module R = Tyxml_js.R.Html
-
+module Js = Js_of_ocaml.Js
+module Dom_html = Js_of_ocaml.Dom_html
+module Dom = Js_of_ocaml.Dom
+         
 let debug = false
 let fps = 30.
 let players = 2
@@ -17,6 +20,15 @@ let players = 2
         > both remove 1 point + 1 life
     . up the points given for milkshakes? (+5)
     . make milkshakes move in patterns?
+    . overall idea;
+      . make into a mix of team / competitive game - like magicka etc.
+        . respawn a bird by flying on top of it 
+        . if flying on top of each-other - gain energy for _special_ weapon
+          . e.g. collective weapon - lasers between all birds, killing stuff
+    . rpg elements
+      . collect stuff that gives traits - e.g. 
+        . pushing monsters away 
+        . spawn a thing that attracts dogs even more 
     . make birds interact?
       . idea; action good for all birds;
         . respawning a lost bird
@@ -630,7 +642,7 @@ let reactive_view : Dom.node Js.t =
             score
             |> IMap.bindings
             |> CCList.flat_map (fun (player, score) -> 
-                   let content = H.pcdata (sp "Flap%d: %d" player score) in
+                   let content = H.txt (sp "Flap%d: %d" player score) in
                    [
                      H.div [ content ];
                      H.br ();
@@ -641,7 +653,7 @@ let reactive_view : Dom.node Js.t =
   in
   let render_debug_overlay entity =
     if not debug then H.div [] else (
-      let debug_text = H.pcdata (
+      let debug_text = H.txt (
           match entity.typ with
           | `Bird _ -> "bird"
           | `Wall -> "wall"
