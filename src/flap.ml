@@ -1,65 +1,15 @@
+open Js_of_ocaml
 open Lwt.Infix
 open Lwt_react
 open ReactiveData
 open Gg
+
 module H = Tyxml_js.Html
 module R = Tyxml_js.R.Html
-module Js = Js_of_ocaml.Js
-module Dom_html = Js_of_ocaml.Dom_html
-module Dom = Js_of_ocaml.Dom
          
 let debug = false
 let fps = 30.
 let players = 2
-
-(*goto game todo
-  . finetune local multiplayer (bird v antimatter-bird)
-    . add 'lives' for birds (room for mistakes)
-    . ? make doggies remove points instead (-1)
-      . like that one is nervous because of dogs - less so if just removing points
-        > both remove 1 point + 1 life
-    . up the points given for milkshakes? (+5)
-    . make milkshakes move in patterns?
-    . overall idea;
-      . make into a mix of team / competitive game - like magicka etc.
-        . respawn a bird by flying on top of it 
-        . if flying on top of each-other - gain energy for _special_ weapon
-          . e.g. collective weapon - lasers between all birds, killing stuff
-    . rpg elements
-      . collect stuff that gives traits - e.g. 
-        . pushing monsters away 
-        . spawn a thing that attracts dogs even more 
-    . make birds interact?
-      . idea; action good for all birds;
-        . respawning a lost bird
-        . explosion pushing away doggies
-        . giving more health to birds
-  . visuals;
-    . prettier walls
-  . experiment with a component structure using frp + vdom
-    . could be used for animation/visualization
-      . so inner state is a fix/fold over item state
-      . ideas;
-        . e.g. implement a trail of following feathers of birds 
-          (better to be own entities? - for recursive interaction with env.)
-        . explosion material flying out (might be better to be own entities..)
-  . performance; 
-    . check if wanna use request animation-frame? 
-      > then would need time-diff to simulate instead - less simple..
-    . think if it's possible to have the style update separately from dom-node?
-  . make milkshakes move in some kind of pattern
-    . could this be a general entity thing? to have an animation-spec 
-      < try to avoid a function here
-  . make it more fun to move around 
-    . idea; have harder to move-through 'puzzles' e.g. 
-      . turning pillars
-      . holes in walls
-      . timing based walls [laser-beam; .. ]
-    . idea; more interesting physics
-      . idea; bouncing on walls instead of dying
-  . elena idea;
-    . bosses when having reached a certain number of points
-*)
 
 let sp = Printf.sprintf
 (*> todo make a version of log that auto-prints newline*)
