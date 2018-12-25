@@ -177,9 +177,9 @@ module Game = struct
         && Random.float 1.0 < (0.2 *. dist_mul)
       in
       if not time_to_spawn then [] else (
-        let width = 200
-        and pos_x = view_w
-        and pos_y = (Random.float 1. *. float view_h) |> truncate in
+        let width = 200 in
+        let pos_x = view_w
+        and pos_y = (Random.float 1. *. float (view_h - width)) |> truncate in
         [
           {
             typ = `Cookie;
