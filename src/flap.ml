@@ -154,7 +154,7 @@ module Game = struct
         && Random.float 1.0 < (0.2 *. dist_mul)
       in
       if not time_to_spawn then [] else (
-        let width = Random.int 150 + 50 in
+        let width = Random.int 64 + 104 in
         let height = Random.int (max 1 (view_h / 3)) + (view_h / 2)
         in
         [
