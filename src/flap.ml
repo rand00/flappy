@@ -9,7 +9,7 @@ module R = Tyxml_js.R.Html
          
 let debug = false
 let fps = 30.
-let players = 2
+let players = 3
 
 let sp = Printf.sprintf
 (*> todo make a version of log that auto-prints newline*)
@@ -29,6 +29,7 @@ module Game = struct
       | `WingFlap of int (*player*) * [ `Left | `Right | `Up | `Down ]
       | `Frame of int
       | `ViewResize of int * int
+      | `PauseToggle 
     ]
 
     let (sink_e : t E.t), sink_eupd = E.create ()
@@ -363,13 +364,14 @@ module Game = struct
     module T = struct 
     
       type t = {
-        birds : Entity.t list;
-        walls : Entity.t list;
-        cookies : Entity.t list;
-        homing_missiles : Entity.t list;
-        background : Entity.t;
-        scoreboard : Entity.t;
-      }[@@deriving show]
+          paused : bool;
+          birds : Entity.t list;
+          walls : Entity.t list;
+          cookies : Entity.t list;
+          homing_missiles : Entity.t list;
+          background : Entity.t;
+          scoreboard : Entity.t;
+        }[@@deriving show]
 
     end
 
@@ -385,13 +387,14 @@ module Game = struct
     ]
     
     let init view_dimensions = {
-      birds = List.init players (Entity.Bird.init view_dimensions);
-      walls = [];
-      cookies = [];
-      homing_missiles = [];
-      background = Entity.init_background view_dimensions;
-      scoreboard = Entity.init_scoreboard view_dimensions;
-    }
+        paused = false;
+        birds = List.init players (Entity.Bird.init view_dimensions);
+        walls = [];
+        cookies = [];
+        homing_missiles = [];
+        background = Entity.init_background view_dimensions;
+        scoreboard = Entity.init_scoreboard view_dimensions;
+      }
     
   end
   
@@ -402,110 +405,120 @@ open Game.Model.T
 
 (**Update*)
 
+let when_not_paused model model' =
+  if model.paused then model else model'
+   
 let game_model_s : Game.Model.t option React.signal = 
   let update model event =
     match event with
     | `WingFlap (player, direction) ->
-      let birds =
-        model.birds 
-        |> List.map (fun bird -> 
-               match bird.typ with
-               | `Bird bird_player when
-                      bird_player.player = player
-                      && not bird.collided -> 
-                  bird
-                  |> (Game.Entity.Bird.move (Some direction))
-                  |> Game.Entity.mark_if_collision
-                       (model.walls @ model.homing_missiles)
-               | _ -> bird
-             )
-      in
-      { model with birds }
+       when_not_paused model @@
+         let birds =
+           model.birds 
+           |> List.map (fun bird -> 
+                  match bird.typ with
+                  | `Bird bird_player when
+                         bird_player.player = player
+                         && not bird.collided -> 
+                     bird
+                     |> (Game.Entity.Bird.move (Some direction))
+                     |> Game.Entity.mark_if_collision
+                          (model.walls @ model.homing_missiles)
+                  | _ -> bird
+                )
+         in
+         { model with birds }
     | `Frame frame ->
-      let dimensions = model.background.width, model.background.height in
-      let walls =
-        model.walls
-        |> List.map (Game.Entity.move_x (-5))
-        |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
-        |> List.append (Game.Entity.init_wall frame dimensions) in
-      let homing_missiles = 
-        model.homing_missiles
-        |> List.map (
-          Game.Entity.Homing_missile.choose_target
-            (model.birds @ model.homing_missiles)
-          %> (fun e -> { e with timeout = e.timeout |> CCOpt.map pred })
-          %> Game.Entity.mark_if_collision (model.birds @ model.walls)
-            ~change:(fun e -> {
-                  e with
-                  width = e.width + 100;
-                  timeout = Some (fps *. 3. |> truncate);
-            })
-          %> Game.Entity.Homing_missile.move
-        )
-        |> List.filter (not % fun e -> e.timeout |> CCOpt.exists (fun t -> t < 0))
-        |> List.filter (not % Game.Entity.is_out_of_bounds dimensions)
-        |> List.append (Game.Entity.Homing_missile.init frame dimensions) in
-      let birds =
-        model.birds
-        |> List.map (fun bird ->
-            bird 
-            |> Game.Entity.Bird.move None
-            |> Game.Entity.mark_if_collision (walls @ homing_missiles) 
-          )
-      in
-      let cookies =
-        model.cookies
-        (*goto could map 'apply_movement' here instead, which should be saved pr. entity
+       when_not_paused model @@
+         let dimensions = model.background.width, model.background.height in
+         let walls =
+           model.walls
+           |> List.map (Game.Entity.move_x (-5))
+           |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
+           |> List.append (Game.Entity.init_wall frame dimensions) in
+         let homing_missiles = 
+           model.homing_missiles
+           |> List.map (
+                  Game.Entity.Homing_missile.choose_target
+                    (model.birds @ model.homing_missiles)
+                  %> (fun e -> { e with timeout = e.timeout |> CCOpt.map pred })
+                  %> Game.Entity.mark_if_collision (model.birds @ model.walls)
+                       ~change:(fun e -> {
+                                    e with
+                                    width = e.width + 100;
+                                    timeout = Some (fps *. 3. |> truncate);
+                       })
+                  %> Game.Entity.Homing_missile.move
+                )
+           |> List.filter (
+                  not % fun e -> e.timeout |> CCOpt.exists (fun t -> t < 0)
+                )
+           |> List.filter (not % Game.Entity.is_out_of_bounds dimensions)
+           |> List.append (Game.Entity.Homing_missile.init frame dimensions) in
+         let birds =
+           model.birds
+           |> List.map (fun bird ->
+                  bird 
+                  |> Game.Entity.Bird.move None
+                  |> Game.Entity.mark_if_collision (walls @ homing_missiles) 
+                )
+         in
+         let cookies =
+           model.cookies
+           (*goto could map 'apply_movement' here instead, which should be saved pr. entity
           < should also include the info about who's being followed?
-        *)
-        |> List.map (Game.Entity.move_x (-10))
-        |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
-        |> List.append (Game.Entity.init_cookie frame dimensions)
-      in
-      let scoreboard, cookies =
-        model.birds
-        |> List.fold_left (fun (scoreboard, cookies) bird -> 
-            let cookies_left = 
-              cookies
-              |> List.filter (not % Game.Entity.collides [bird])
-            in
-            let scored_now = List.(length cookies - length cookies_left) in
-            let scoreboard = Game.Entity.increment_score
-                ~scored_now
-                ~bird
-                scoreboard
-            in
-            scoreboard, cookies_left
-          ) (model.scoreboard, cookies)
-      in
-      {
-        birds;
-        walls;
-        cookies;
-        homing_missiles;
-        scoreboard;
-        background = model.background
-      }
+            *)
+           |> List.map (Game.Entity.move_x (-10))
+           |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
+           |> List.append (Game.Entity.init_cookie frame dimensions)
+         in
+         let scoreboard, cookies =
+           model.birds
+           |> List.fold_left (fun (scoreboard, cookies) bird -> 
+                  let cookies_left = 
+                    cookies
+                    |> List.filter (not % Game.Entity.collides [bird])
+                  in
+                  let scored_now = List.(length cookies - length cookies_left) in
+                  let scoreboard = Game.Entity.increment_score
+                                     ~scored_now
+                                     ~bird
+                                     scoreboard
+                  in
+                  scoreboard, cookies_left
+                ) (model.scoreboard, cookies)
+         in
+         {
+           birds;
+           walls;
+           cookies;
+           homing_missiles;
+           scoreboard;
+           background = model.background;
+           paused = model.paused;
+         }
+    | `PauseToggle -> { model with paused = not model.paused }
     | `ViewResize dimensions ->
-      let prev_dimensions = (model.background.width, model.background.height) in
-      let reposition e =
-        Game.Entity.reposition prev_dimensions dimensions e
-      in
-      let birds = model.birds |> List.map reposition in
-      let walls = model.walls |> List.map reposition in
-      let cookies = model.cookies |> List.map reposition in
-      let homing_missiles = model.homing_missiles |> List.map reposition in
-      let scoreboard = model.scoreboard |> reposition in
-      let background = model.background |> Game.Entity.resize dimensions 
-      in
-      {
-        birds;
-        walls;
-        background;
-        homing_missiles;
-        scoreboard;
-        cookies
-      }
+       let prev_dimensions = (model.background.width, model.background.height) in
+       let reposition e =
+         Game.Entity.reposition prev_dimensions dimensions e
+       in
+       let birds = model.birds |> List.map reposition in
+       let walls = model.walls |> List.map reposition in
+       let cookies = model.cookies |> List.map reposition in
+       let homing_missiles = model.homing_missiles |> List.map reposition in
+       let scoreboard = model.scoreboard |> reposition in
+       let background = model.background |> Game.Entity.resize dimensions 
+       in
+       {
+         birds;
+         walls;
+         background;
+         homing_missiles;
+         scoreboard;
+         cookies;
+         paused = model.paused;
+       }
   in
   Game.Event.sink_e
   |> E.fold update (Game.Model.init (1920, 1080))
@@ -581,11 +594,11 @@ let reactive_view : Dom.node Js.t =
         in
         H.div ~a:[ H.a_style style ] []
       | `Wall ->
-        let style = style_of_entity entity "assets/korean.gif" in
+        let style = style_of_entity entity "assets/drawn/street_light.png" in
         H.div ~a:[ H.a_style style ] []
       | `Background ->
-        let style = style_of_entity entity "assets/turtle_golf.jpeg" in
-        H.div ~a:[ H.a_style style ] []
+         let style = style_of_entity entity "assets/drawn/smoggy_buildings.png" in
+         H.div ~a:[ H.a_style style ] []
       | `Scoreboard score ->
         let style = style_of_entity entity "" in
         H.div ~a:[ H.a_style style ] (
@@ -680,6 +693,8 @@ let init_game () =
       | 74 (*j*) -> Game.Event.sink_eupd (`WingFlap (2, `Left))
       | 75 (*k*) -> Game.Event.sink_eupd (`WingFlap (2, `Down))
       | 76 (*l*) -> Game.Event.sink_eupd (`WingFlap (2, `Right))
+
+      | 80 (*p*) -> Game.Event.sink_eupd `PauseToggle
       | _ -> ()
     in
     Js._true
