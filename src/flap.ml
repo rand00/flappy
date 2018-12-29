@@ -154,9 +154,12 @@ module Game = struct
         && Random.float 1.0 < (0.2 *. dist_mul)
       in
       if not time_to_spawn then [] else (
-        let width = Random.int 64 + 104 in
+        let is_top = Random.bool () in
+        let width =
+          if is_top then 91 else Random.int 64 + 104
+        in
         let height = Random.int (max 1 (view_h / 3)) + (view_h / 2) in
-        let is_top = Random.bool () 
+        let pos_y = if is_top then 0 else view_h - height 
         in
         [
           {
@@ -164,7 +167,7 @@ module Game = struct
             width;
             height;
             pos_x = view_w;
-            pos_y = if is_top then 0 else view_h - height;
+            pos_y;
             collided = false;
             timeout = None;
           }
@@ -529,15 +532,18 @@ let game_model_s : Game.Model.t option React.signal =
 (**View*)
 
 let style_of_entity
-    ?rotate ?extend ?background_color ?z_index ?filter
-    entity image
+      ?extend ?extend_left ?extend_right
+      ?rotate ?background_color ?z_index ?filter
+      entity image
   =
   let ext = CCOpt.get_or ~default:0 extend in
+  let ext_l = CCOpt.get_or ~default:0 extend_left in
+  let ext_r = CCOpt.get_or ~default:0 extend_right in
   let width, height =
-    entity.width + ext * 2,
-    entity.height + ext * 2
+    entity.width + ext * 2 + ext_l + ext_r,
+    entity.height + ext * 2 + ext_l + ext_r
   and pos_x, pos_y =
-    entity.pos_x - ext,
+    entity.pos_x - ext - ext_l,
     entity.pos_y - ext
   in
   Style.make ([
@@ -598,7 +604,6 @@ let reactive_view : Dom.node Js.t =
          let image = match position with 
            | `Bottom -> "assets/drawn/street_light.png" 
            | `Top ->    "assets/drawn/hanging_power_cords.png"
-            (*goto should have width '91 px' + min heigth 543 px*)
          in
          let style = style_of_entity entity image in
         H.div ~a:[ H.a_style style ] []
