@@ -155,10 +155,10 @@ module Game = struct
       in
       if not time_to_spawn then [] else (
         let is_top = Random.bool () in
-        let width =
-          if is_top then 91 else Random.int 64 + 104
-        in
+        (*goto, should be based on aspect ratio of image*)
+        let aspect = 0.17 in
         let height = Random.int (max 1 (view_h / 3)) + (view_h / 2) in
+        let width = float height *. aspect |> truncate in
         let pos_y = if is_top then 0 else view_h - height 
         in
         [
@@ -601,8 +601,9 @@ let reactive_view : Dom.node Js.t =
         in
         H.div ~a:[ H.a_style style ] []
       | `Wall position ->
-         let image = match position with 
-           | `Bottom -> "assets/drawn/street_light.png" 
+         let image =
+           match position with 
+           | `Bottom -> "assets/drawn/street_light.png"
            | `Top ->    "assets/drawn/hanging_power_cords.png"
          in
          let style = style_of_entity entity image in
