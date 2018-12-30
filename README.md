@@ -4,6 +4,14 @@ Primary point of this is to showcase how to use OCaml and its existing
 libraries, to write powerful but simple code with an Elm-like structure. 
 See `flap.ml` for the game-code.
 
+### Updates
+* Other birds can now revive a fallen bird by flying into feathers
+* Begun drawing own assets
+* Added local multiplayer
+* Added smoot multi-directional vector-based movement
+* Added homing dogs 
+* ... 
+
 #### Goals:
 - [x] Elm-like code using frp (`react`) + typesafe html (`tyxml`) + 
 virtual DOM (`reactiveData` + `tyxml_js`). 
@@ -31,8 +39,3 @@ problems. E.g. homing missiles.
 * Open `webout/index.html` in your favorite browser
 * Use w/a/s/d + i/j/k/l + arrow-keys to fly (depending on the value of `players` in `flap.ml`)
 
-### Updates
-* Added local multiplayer
-* Added smoot multi-directional vector-based movement
-* Added homing dogs 
-* ... 
