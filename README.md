@@ -12,7 +12,7 @@ See `flap.ml` for the game-code.
 * Added homing dogs 
 * ... 
 
-#### Goals:
+### Goals:
 - [x] Elm-like code using frp (`react`) + typesafe html (`tyxml`) + 
 virtual DOM (`reactiveData` + `tyxml_js`). 
   * Simple
