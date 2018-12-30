@@ -53,28 +53,48 @@ module Game = struct
 
     module T = struct 
 
-      type homing_missile = {
-        target : t option;
-        movement_vector : V2.t;
-      }[@@deriving show]
-
-      and bird = {
+      type bird = [ `Bird of bird_data ]
+      [@@deriving show]
+      and bird_data = {
         player : int;
         movement_vector : V2.t;
       }[@@deriving show]
 
-      and typ = [
-        | `Bird of bird
-        | `Feathers of int (*player*)
-        | `Wall of [ `Top | `Bottom ]
-        | `Background
-        | `Scoreboard of (int IMap.t [@printer IMap.pp CCInt.pp CCInt.pp])
-        | `Cookie
-        | `Homing_missile of homing_missile
+      type 'a homing_missile = [ `Homing_missile of 'a ]
+      [@@deriving show]
+
+      type feathers = [ `Feathers of int (*player*) ]
+      [@@deriving show]
+
+      type cookie = [ `Cookie ]
+      [@@deriving show]
+
+      type wall = [ `Wall of [ `Top | `Bottom ] ]
+      [@@deriving show]
+
+      type background = [ `Background ]
+      [@@deriving show]
+
+      type scoreboard = [ `Scoreboard of (int IMap.t [@printer IMap.pp CCInt.pp CCInt.pp]) ]
+      [@@deriving show]
+      
+      type typ = [
+        | bird
+        | cookie
+        | feathers
+        | wall
+        | background
+        | scoreboard
+        | homing_missile_data homing_missile
       ][@@deriving show]
 
-      and t = {
-        typ : typ;
+      and homing_missile_data = {
+        target : [ bird | homing_missile_data homing_missile ] t option;
+        movement_vector : V2.t;
+      }[@@deriving show]
+
+      and 'a t = {
+        typ : 'a;
         width : int;
         height : int;
         pos_x : int;
@@ -388,29 +408,36 @@ module Game = struct
     module T = struct 
 
       type t = {
+        birds :      Entity.bird Entity.t list;
+        feathers :   Entity.feathers Entity.t list;
+        walls :      Entity.wall Entity.t list;
+        cookies :    Entity.cookie Entity.t list;
+        homing_missiles :
+          Entity.homing_missile_data Entity.homing_missile
+            Entity.t list;
+        background : Entity.background Entity.t;
+        scoreboard : Entity.scoreboard Entity.t;
         paused : bool;
-        birds : Entity.t list;
-        feathers : Entity.t list;
-        walls : Entity.t list;
-        cookies : Entity.t list;
-        homing_missiles : Entity.t list;
-        background : Entity.t;
-        scoreboard : Entity.t;
       }[@@deriving show]
 
     end
 
     include T
 
-    let to_list m = List.flatten [
-        [ m.background ];
-        m.walls;
-        m.cookies;
-        m.birds;
-        m.feathers;
-        m.homing_missiles;
-        [ m.scoreboard ];
-      ]
+    let to_list : t -> Entity.typ Entity.t list =
+      fun m -> List.flatten [
+          [ (m.background    : Entity.background Entity.t  :> Entity.typ Entity.t) ];
+          (m.feathers        : Entity.feathers Entity.t list :> Entity.typ Entity.t list);
+          (m.walls           : Entity.wall Entity.t list   :> Entity.typ Entity.t list);
+          (m.cookies         : Entity.cookie Entity.t list :> Entity.typ Entity.t list);
+          (m.birds           : Entity.bird Entity.t list   :> Entity.typ Entity.t list);
+          (m.homing_missiles :
+             Entity.homing_missile_data
+               Entity.homing_missile Entity.t list
+           :> Entity.typ Entity.t list
+          );
+          [ (m.scoreboard    : Entity.scoreboard Entity.t :> Entity.typ Entity.t) ];
+        ]
 
     let init view_dimensions = {
       paused = false;
