@@ -485,7 +485,9 @@ module Game = struct
                   | Some bird -> 
                     Some { bird with
                            pos_x = feather.pos_x;
-                           pos_y = feather.pos_y
+                           pos_y = feather.pos_y;
+                           collided = false;
+                           timeout = None;
                          }
                 in
                 let acc_birds =
