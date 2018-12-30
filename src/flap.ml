@@ -424,31 +424,84 @@ module Game = struct
         ~collision_entities
         model
       =
+      (*Moving birds and spawning feathers*)
       let init = [], model.feathers in
-      model.birds |> List.fold_left (fun (acc_birds, acc_feathers) bird -> 
-          match bird.Entity.typ with
-          | `Bird bird_data when
-              begin match player_and_direction with
-                | Some (player, _) -> player = bird_data.player
-                | None -> true
-              end
-            -> 
-            let bird, just_collided =
-              let bird' = 
-                bird
-                |> Entity.Bird.move (CCOpt.map snd player_and_direction)
-                |> Entity.mark_if_collision collision_entities in
-              let just_collided = bird'.collided && not bird.collided in
-              bird', just_collided
-            in
-            if just_collided then
-              let feathers = Entity.Feathers.of_bird bird in
-              bird :: acc_birds, feathers :: acc_feathers
-            else
+      let birds, feathers =
+        model.birds |> List.fold_left (fun (acc_birds, acc_feathers) bird -> 
+            match bird.Entity.typ with
+            | `Bird bird_data when
+                begin match player_and_direction with
+                  | Some (player, _) -> player = bird_data.player
+                  | None -> true
+                end
+              -> 
+              let bird, just_collided =
+                let bird' = 
+                  bird
+                  |> Entity.Bird.move (CCOpt.map snd player_and_direction)
+                  |> Entity.mark_if_collision collision_entities in
+                let just_collided = bird'.collided && not bird.collided in
+                bird', just_collided
+              in
+              if just_collided then
+                let feathers = Entity.Feathers.of_bird bird in
+                bird :: acc_birds, feathers :: acc_feathers
+              else
+                bird :: acc_birds, acc_feathers
+            | _ ->
               bird :: acc_birds, acc_feathers
-          | _ ->
-            bird :: acc_birds, acc_feathers
-        ) init
+          ) init
+      in
+      (*Resetting birds and removing feathers*)
+      let birds_assoc, feathers =
+        let birds_of_players =
+          birds |> List.map (function
+              | { Entity.typ = `Bird {player} } as e -> player, e
+              | e ->
+                log "birds_of_players: Wasn't a bird!\n";
+                -1, e
+            )
+        in
+        let init = birds_of_players, [] in
+        feathers
+        |> List.fold_left (fun (acc_birds, feathers_left) feather ->
+            match feather.Entity.typ with
+            | `Feathers player_of_feather -> 
+              let other_birds =
+                birds
+                |> List.fold_left (fun others bird ->
+                    match bird.Entity.typ with
+                    | `Bird {player} when player = player_of_feather ->
+                      others
+                    | _ ->
+                      bird :: others
+                  ) []
+              in
+              let collided = feather |> Entity.collides other_birds in
+              let open Entity.T in
+              if collided then
+                let revive_bird = function
+                  | None -> None
+                  | Some bird -> 
+                    Some { bird with
+                           pos_x = feather.pos_x;
+                           pos_y = feather.pos_y
+                         }
+                in
+                let acc_birds =
+                  acc_birds
+                  |> CCList.Assoc.update revive_bird player_of_feather
+                    ~eq:CCInt.equal
+                in
+                acc_birds, feathers_left
+              else 
+                acc_birds, feather :: feathers_left
+            | _ -> failwith "Wrong entity type"
+            (*< goto find better way to model types of entities?*)
+          ) init
+      in
+      let birds = birds_assoc |> List.map snd in
+      birds, feathers
 
   end
 
