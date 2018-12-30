@@ -65,6 +65,7 @@ module Game = struct
       
       and typ = [
         | `Bird of bird
+        | `Feathers of int (*player*)
         | `Wall of [ `Top | `Bottom ]
         | `Background
         | `Scoreboard of (int IMap.t [@printer IMap.pp CCInt.pp CCInt.pp])
@@ -90,6 +91,62 @@ module Game = struct
       let x , y  = float e.pos_x, float e.pos_y in
       let x', y' = float e'.pos_x, float e'.pos_y in
       sqrt ((x -. x') ** 2. +. (y -. y') ** 2.)
+
+    let move_x px e = {
+      e with pos_x = e.pos_x + px
+    }
+
+    let move_y px e = {
+      e with pos_y = e.pos_y + px
+    }
+
+    let resize (width, height) e = {
+      e with width; height
+    }
+
+    let reposition (prev_w, prev_h) (w, h) e =
+      let prev_x, prev_y = float e.pos_x, float e.pos_y in
+      let prev_w, prev_h = max 1. (float prev_w), max 1. (float prev_h) in
+      let w, h = float w, float h in
+      let x = (prev_x /. prev_w) *. w |> truncate 
+      and y = (prev_y /. prev_h) *. h |> truncate in
+      { e with pos_x = x; pos_y = y }
+
+    (*Note: e is out of bounds if whole e-area is out of bounds*)
+    let is_out_of_bounds (w, h) e =
+      let eps = 0 in
+      e.pos_x + e.width < 0 - eps ||
+      e.pos_y + e.height < 0 - eps ||
+      e.pos_x > w + eps ||
+      e.pos_y > w + eps
+
+    let collides es e =
+      let range_x e = e.pos_x, e.pos_x + e.width in
+      let range_y e = e.pos_y, e.pos_y + e.height in
+      (*note - this is a point <-> range relation*)
+      let is_contained_1d i (start, stop) =
+        start <= i && i <= stop
+      in
+      (*note - this is a range <-> range relation*)
+      let is_collision_1d ((start,stop) as r) ((start',stop') as r') =
+        is_contained_1d start  r' ||
+        is_contained_1d stop   r' ||
+        is_contained_1d start' r  ||
+        is_contained_1d stop'  r 
+      in
+      (*note - this is a 2d-range <-> 2d-range relation*)
+      let is_collision_2d e' =
+        is_collision_1d (range_x e) (range_x e') &&
+        is_collision_1d (range_y e) (range_y e')
+      in
+      List.exists is_collision_2d es
+
+    let mark_if_collision ?change es e =
+      if (not @@ collides es e) || e.collided then e else
+        let e = { e with collided = true } in
+        match change with
+        | Some change -> change e
+        | None -> e
 
     module Bird = struct 
 
@@ -137,6 +194,22 @@ module Game = struct
 
     end
 
+    module Feathers = struct
+
+      let of_bird bird =
+        match bird.typ with
+        | `Bird bird_data -> 
+          { bird with
+            typ = `Feathers bird_data.player;
+            collided = false;
+            timeout = None
+          }
+        | _ ->
+           log "Was not a bird!\n";
+           bird
+
+    end
+                
     let init_background (view_w, view_h) = {
       typ = `Background;
       width = view_w;
@@ -155,7 +228,6 @@ module Game = struct
       in
       if not time_to_spawn then [] else (
         let is_top = Random.bool () in
-        (*goto, should be based on aspect ratio of image*)
         let aspect = 0.17 in
         let height = Random.int (max 1 (view_h / 3)) + (view_h / 2) in
         let width = float height *. aspect |> truncate in
@@ -305,62 +377,6 @@ module Game = struct
         log "this was not a scoreboard+bird !\n";
         e 
 
-    let move_x px e = {
-      e with pos_x = e.pos_x + px
-    }
-
-    let move_y px e = {
-      e with pos_y = e.pos_y + px
-    }
-
-    let resize (width, height) e = {
-      e with width; height
-    }
-
-    let reposition (prev_w, prev_h) (w, h) e =
-      let prev_x, prev_y = float e.pos_x, float e.pos_y in
-      let prev_w, prev_h = max 1. (float prev_w), max 1. (float prev_h) in
-      let w, h = float w, float h in
-      let x = (prev_x /. prev_w) *. w |> truncate 
-      and y = (prev_y /. prev_h) *. h |> truncate in
-      { e with pos_x = x; pos_y = y }
-    
-    (*Note: e is out of bounds if whole e-area is out of bounds*)
-    let is_out_of_bounds (w, h) e =
-      let eps = 0 in
-      e.pos_x + e.width < 0 - eps ||
-      e.pos_y + e.height < 0 - eps ||
-      e.pos_x > w + eps ||
-      e.pos_y > w + eps
-    
-    let collides es e =
-      let range_x e = e.pos_x, e.pos_x + e.width in
-      let range_y e = e.pos_y, e.pos_y + e.height in
-      (*note - this is a point <-> range relation*)
-      let is_contained_1d i (start, stop) =
-        start <= i && i <= stop
-      in
-      (*note - this is a range <-> range relation*)
-      let is_collision_1d ((start,stop) as r) ((start',stop') as r') =
-        is_contained_1d start  r' ||
-        is_contained_1d stop   r' ||
-        is_contained_1d start' r  ||
-        is_contained_1d stop'  r 
-      in
-      (*note - this is a 2d-range <-> 2d-range relation*)
-      let is_collision_2d e' =
-        is_collision_1d (range_x e) (range_x e') &&
-        is_collision_1d (range_y e) (range_y e')
-      in
-      List.exists is_collision_2d es
-
-    let mark_if_collision ?change es e =
-      if (not @@ collides es e) || e.collided then e else
-        let e = { e with collided = true } in
-        match change with
-        | Some change -> change e
-        | None -> e
-
   end
 
   module Model = struct
@@ -370,6 +386,7 @@ module Game = struct
       type t = {
           paused : bool;
           birds : Entity.t list;
+          feathers : Entity.t list;
           walls : Entity.t list;
           cookies : Entity.t list;
           homing_missiles : Entity.t list;
@@ -386,6 +403,7 @@ module Game = struct
       m.walls;
       m.cookies;
       m.birds;
+      m.feathers;
       m.homing_missiles;
       [ m.scoreboard ];
     ]
@@ -393,13 +411,45 @@ module Game = struct
     let init view_dimensions = {
         paused = false;
         birds = List.init players (Entity.Bird.init view_dimensions);
+        feathers = [];
         walls = [];
         cookies = [];
         homing_missiles = [];
         background = Entity.init_background view_dimensions;
         scoreboard = Entity.init_scoreboard view_dimensions;
       }
-    
+
+    let update_birds_and_feathers
+        ?player_and_direction
+        ~collision_entities
+        model
+      =
+      let init = [], model.feathers in
+      model.birds |> List.fold_left (fun (acc_birds, acc_feathers) bird -> 
+        match bird.Entity.typ with
+        | `Bird bird_data when
+            begin match player_and_direction with
+              | Some (player, _) -> player = bird_data.player
+              | None -> true
+            end
+          -> 
+          let bird, just_collided =
+            let bird' = 
+              bird
+              |> Entity.Bird.move (CCOpt.map snd player_and_direction)
+              |> Entity.mark_if_collision collision_entities in
+            let just_collided = bird'.collided && not bird.collided in
+            bird', just_collided
+          in
+          if just_collided then
+            let feathers = Entity.Feathers.of_bird bird in
+            bird :: acc_birds, feathers :: acc_feathers
+          else
+            bird :: acc_birds, acc_feathers
+        | _ ->
+          bird :: acc_birds, acc_feathers
+        ) init
+
   end
   
 end
@@ -416,22 +466,14 @@ let game_model_s : Game.Model.t option React.signal =
   let update model event =
     match event with
     | `WingFlap (player, direction) ->
-       when_not_paused model @@
-         let birds =
-           model.birds 
-           |> List.map (fun bird -> 
-                  match bird.typ with
-                  | `Bird bird_player when
-                         bird_player.player = player
-                         && not bird.collided -> 
-                     bird
-                     |> (Game.Entity.Bird.move (Some direction))
-                     |> Game.Entity.mark_if_collision
-                          (model.walls @ model.homing_missiles)
-                  | _ -> bird
-                )
-         in
-         { model with birds }
+      when_not_paused model @@
+      let birds, feathers =
+        Game.Model.update_birds_and_feathers
+          ~player_and_direction:(player, direction)
+          ~collision_entities:(model.walls @ model.homing_missiles)
+          model
+      in
+      { model with birds; feathers }
     | `Frame frame ->
        when_not_paused model @@
          let dimensions = model.background.width, model.background.height in
@@ -459,13 +501,10 @@ let game_model_s : Game.Model.t option React.signal =
                 )
            |> List.filter (not % Game.Entity.is_out_of_bounds dimensions)
            |> List.append (Game.Entity.Homing_missile.init frame dimensions) in
-         let birds =
-           model.birds
-           |> List.map (fun bird ->
-                  bird 
-                  |> Game.Entity.Bird.move None
-                  |> Game.Entity.mark_if_collision (walls @ homing_missiles) 
-                )
+         let birds, feathers =
+           Game.Model.update_birds_and_feathers 
+             ~collision_entities:(walls @ homing_missiles)
+             model
          in
          let cookies =
            model.cookies
@@ -494,6 +533,7 @@ let game_model_s : Game.Model.t option React.signal =
          in
          {
            birds;
+           feathers;
            walls;
            cookies;
            homing_missiles;
@@ -508,6 +548,7 @@ let game_model_s : Game.Model.t option React.signal =
          Game.Entity.reposition prev_dimensions dimensions e
        in
        let birds = model.birds |> List.map reposition in
+       let feathers = model.feathers |> List.map reposition in
        let walls = model.walls |> List.map reposition in
        let cookies = model.cookies |> List.map reposition in
        let homing_missiles = model.homing_missiles |> List.map reposition in
@@ -516,6 +557,7 @@ let game_model_s : Game.Model.t option React.signal =
        in
        {
          birds;
+         feathers;
          walls;
          background;
          homing_missiles;
@@ -586,6 +628,15 @@ let reactive_view : Dom.node Js.t =
           in
           H.div ~a:[ H.a_style style ] []
         end
+      | `Feathers player ->
+        let extend = 50 in
+        let hue_rotate_degrees =
+          360. *. (float player) /. (float players) |> truncate in
+        let style = style_of_entity entity "assets/feathers.gif"
+            ~extend
+            ~filter:(`Hue_rotate hue_rotate_degrees)
+        in
+        H.div ~a:[ H.a_style style ] []
       | `Cookie ->
         let style = style_of_entity entity "assets/milkshake.png" in
         H.div ~a:[ H.a_style style ] []
@@ -631,6 +682,7 @@ let reactive_view : Dom.node Js.t =
       let debug_text = H.txt (
           match entity.typ with
           | `Bird _ -> "bird"
+          | `Feathers _ -> "feathers"
           | `Wall _ -> "wall"
           | `Background -> "background"
           | `Scoreboard _ -> "scoreboard"
