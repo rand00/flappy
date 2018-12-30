@@ -353,29 +353,33 @@ module Game = struct
 
     end
 
-    let init_scoreboard (view_w, view_h) = {
-      typ = `Scoreboard IMap.empty;
-      width = 550;
-      height = 0;
-      pos_x = view_w - 283;
-      pos_y = view_h - (80 * players);
-      collided = false;
-      timeout = None;
-    }
+    module Scoreboard = struct 
+    
+      let init (view_w, view_h) = {
+        typ = `Scoreboard IMap.empty;
+        width = 550;
+        height = 0;
+        pos_x = view_w - 283;
+        pos_y = view_h - (80 * players);
+        collided = false;
+        timeout = None;
+      }
 
-    let increment_score ~scored_now ~bird e =
-      match e.typ, bird.typ with
-      | `Scoreboard scores, `Bird {player} ->
-        let scores =
-          scores |> IMap.update player (function
-              | None -> Some scored_now
-              | Some score -> Some (scored_now + score)
-            )
-        in
-        { e with typ = `Scoreboard scores }
-      | typ ->
-        log "this was not a scoreboard+bird !\n";
-        e 
+      let increment ~scored_now ~bird e =
+        match e.typ, bird.typ with
+        | `Scoreboard scores, `Bird {player} ->
+          let scores =
+            scores |> IMap.update player (function
+                | None -> Some scored_now
+                | Some score -> Some (scored_now + score)
+              )
+          in
+          { e with typ = `Scoreboard scores }
+        | typ ->
+          log "this was not a scoreboard+bird !\n";
+          e
+
+    end
 
   end
 
@@ -416,7 +420,7 @@ module Game = struct
       cookies = [];
       homing_missiles = [];
       background = Entity.init_background view_dimensions;
-      scoreboard = Entity.init_scoreboard view_dimensions;
+      scoreboard = Entity.Scoreboard.init view_dimensions;
     }
 
     let update_birds_and_feathers
@@ -465,41 +469,39 @@ module Game = struct
         let init = birds_of_players, [] in
         feathers
         |> List.fold_left (fun (acc_birds, feathers_left) feather ->
-            match feather.Entity.typ with
-            | `Feathers player_of_feather -> 
-              let other_birds =
-                birds
-                |> List.fold_left (fun others bird ->
-                    match bird.Entity.typ with
-                    | `Bird {player} when player = player_of_feather ->
-                      others
-                    | _ ->
-                      bird :: others
-                  ) []
-              in
-              let collided = feather |> Entity.collides other_birds in
-              let open Entity.T in
-              if collided then
-                let revive_bird = function
-                  | None -> None
-                  | Some bird -> 
-                    Some { bird with
-                           pos_x = feather.pos_x;
-                           pos_y = feather.pos_y;
-                           collided = false;
-                           timeout = None;
-                         }
+            begin match feather.Entity.typ with
+              | `Feathers feather_player -> 
+                let other_birds =
+                  birds |> List.filter (fun others bird ->
+                      match bird.Entity.typ with
+                      | `Bird {player} -> not (player = feather_player)
+                      | _ -> true
+                    ) []
                 in
-                let acc_birds =
-                  acc_birds
-                  |> CCList.Assoc.update revive_bird player_of_feather
-                    ~eq:CCInt.equal
-                in
-                acc_birds, feathers_left
-              else 
-                acc_birds, feather :: feathers_left
-            | _ -> failwith "Wrong entity type"
-            (*< goto find better way to model types of entities?*)
+                let open Entity.T in
+                if feather |> Entity.collides other_birds then
+                  let revive_bird = function
+                    | None -> None
+                    | Some bird -> 
+                      Some { bird with
+                             pos_x = feather.pos_x;
+                             pos_y = feather.pos_y;
+                             collided = false;
+                             timeout = None;
+                           }
+                  in
+                  let acc_birds =
+                    CCList.Assoc.update revive_bird
+                      feather_player
+                      acc_birds
+                      ~eq:CCInt.equal
+                  in
+                  acc_birds, feathers_left
+                else 
+                  acc_birds, feather :: feathers_left
+              | _ -> failwith "Wrong entity type"
+              (*< goto find better way to model types of entities?*)
+            end
           ) init
       in
       let birds = birds_assoc |> List.map snd in
@@ -578,7 +580,7 @@ let game_model_s : Game.Model.t option React.signal =
               |> List.filter (not % Game.Entity.collides [bird])
             in
             let scored_now = List.(length cookies - length cookies_left) in
-            let scoreboard = Game.Entity.increment_score
+            let scoreboard = Game.Entity.Scoreboard.increment
                 ~scored_now
                 ~bird
                 scoreboard
