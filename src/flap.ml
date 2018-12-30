@@ -6,7 +6,7 @@ open Gg
 
 module H = Tyxml_js.Html
 module R = Tyxml_js.R.Html
-         
+
 let debug = false
 let fps = 30.
 let players = 3
@@ -18,7 +18,7 @@ let (%) f g x = f (g x)
 let (%>) f g x = g (f x)
 
 module IMap = CCMap.Make(CCInt)
-      
+
 (* type entity_html = Html_types.body_content H.elt (\*possibly reactive*\) *)
 
 module Game = struct
@@ -38,7 +38,7 @@ module Game = struct
         | `ViewResize (x, y) -> log "window resize %d x %d\n" x y
         | _ -> ()
       )
-    
+
     let feed_frp () =
       let rec loop frame =
         sink_eupd (`Frame frame);
@@ -62,7 +62,7 @@ module Game = struct
         player : int;
         movement_vector : V2.t;
       }[@@deriving show]
-      
+
       and typ = [
         | `Bird of bird
         | `Feathers of int (*player*)
@@ -205,11 +205,11 @@ module Game = struct
             timeout = None
           }
         | _ ->
-           log "Was not a bird!\n";
-           bird
+          log "Was not a bird!\n";
+          bird
 
     end
-                
+
     let init_background (view_w, view_h) = {
       typ = `Background;
       width = view_w;
@@ -270,7 +270,7 @@ module Game = struct
       )
 
     module Homing_missile = struct 
-    
+
       let init frame (view_w, view_h) =
         let time_to_spawn =
           frame mod truncate (fps *. 0.5) = 0
@@ -302,18 +302,18 @@ module Game = struct
               match acc with
               | None -> if distance missile e > 0.1 then Some e else None
               | Some e' ->
-                 let factor e = match e.typ with
-                   | `Bird _ -> 0.6 | _ -> 1.
-                 in
-                 let chosen =
-                   let dist_e, dist_e' = distance missile e, distance missile e' in
-                   let prio_e, prio_e' = factor e, factor e' in
-                   if
-                     prio_e *. dist_e < prio_e' *. dist_e' &&
-                       dist_e > 0.1 (*to avoid itself*)
-                   then e
-                   else e'
-                 in Some chosen
+                let factor e = match e.typ with
+                  | `Bird _ -> 0.6 | _ -> 1.
+                in
+                let chosen =
+                  let dist_e, dist_e' = distance missile e, distance missile e' in
+                  let prio_e, prio_e' = factor e, factor e' in
+                  if
+                    prio_e *. dist_e < prio_e' *. dist_e' &&
+                    dist_e > 0.1 (*to avoid itself*)
+                  then e
+                  else e'
+                in Some chosen
             ) None targets
         in
         match missile.typ with
@@ -352,7 +352,7 @@ module Game = struct
         | _ -> missile (*goto make 'log_and_return "tag" entity' a helper *)
 
     end
-    
+
     let init_scoreboard (view_w, view_h) = {
       typ = `Scoreboard IMap.empty;
       width = 550;
@@ -382,42 +382,42 @@ module Game = struct
   module Model = struct
 
     module T = struct 
-    
+
       type t = {
-          paused : bool;
-          birds : Entity.t list;
-          feathers : Entity.t list;
-          walls : Entity.t list;
-          cookies : Entity.t list;
-          homing_missiles : Entity.t list;
-          background : Entity.t;
-          scoreboard : Entity.t;
-        }[@@deriving show]
+        paused : bool;
+        birds : Entity.t list;
+        feathers : Entity.t list;
+        walls : Entity.t list;
+        cookies : Entity.t list;
+        homing_missiles : Entity.t list;
+        background : Entity.t;
+        scoreboard : Entity.t;
+      }[@@deriving show]
 
     end
 
     include T
 
     let to_list m = List.flatten [
-      [ m.background ];
-      m.walls;
-      m.cookies;
-      m.birds;
-      m.feathers;
-      m.homing_missiles;
-      [ m.scoreboard ];
-    ]
-    
+        [ m.background ];
+        m.walls;
+        m.cookies;
+        m.birds;
+        m.feathers;
+        m.homing_missiles;
+        [ m.scoreboard ];
+      ]
+
     let init view_dimensions = {
-        paused = false;
-        birds = List.init players (Entity.Bird.init view_dimensions);
-        feathers = [];
-        walls = [];
-        cookies = [];
-        homing_missiles = [];
-        background = Entity.init_background view_dimensions;
-        scoreboard = Entity.init_scoreboard view_dimensions;
-      }
+      paused = false;
+      birds = List.init players (Entity.Bird.init view_dimensions);
+      feathers = [];
+      walls = [];
+      cookies = [];
+      homing_missiles = [];
+      background = Entity.init_background view_dimensions;
+      scoreboard = Entity.init_scoreboard view_dimensions;
+    }
 
     let update_birds_and_feathers
         ?player_and_direction
@@ -426,32 +426,32 @@ module Game = struct
       =
       let init = [], model.feathers in
       model.birds |> List.fold_left (fun (acc_birds, acc_feathers) bird -> 
-        match bird.Entity.typ with
-        | `Bird bird_data when
-            begin match player_and_direction with
-              | Some (player, _) -> player = bird_data.player
-              | None -> true
-            end
-          -> 
-          let bird, just_collided =
-            let bird' = 
-              bird
-              |> Entity.Bird.move (CCOpt.map snd player_and_direction)
-              |> Entity.mark_if_collision collision_entities in
-            let just_collided = bird'.collided && not bird.collided in
-            bird', just_collided
-          in
-          if just_collided then
-            let feathers = Entity.Feathers.of_bird bird in
-            bird :: acc_birds, feathers :: acc_feathers
-          else
+          match bird.Entity.typ with
+          | `Bird bird_data when
+              begin match player_and_direction with
+                | Some (player, _) -> player = bird_data.player
+                | None -> true
+              end
+            -> 
+            let bird, just_collided =
+              let bird' = 
+                bird
+                |> Entity.Bird.move (CCOpt.map snd player_and_direction)
+                |> Entity.mark_if_collision collision_entities in
+              let just_collided = bird'.collided && not bird.collided in
+              bird', just_collided
+            in
+            if just_collided then
+              let feathers = Entity.Feathers.of_bird bird in
+              bird :: acc_birds, feathers :: acc_feathers
+            else
+              bird :: acc_birds, acc_feathers
+          | _ ->
             bird :: acc_birds, acc_feathers
-        | _ ->
-          bird :: acc_birds, acc_feathers
         ) init
 
   end
-  
+
 end
 
 open Game.Entity.T
@@ -461,7 +461,7 @@ open Game.Model.T
 
 let when_not_paused model model' =
   if model.paused then model else model'
-   
+
 let game_model_s : Game.Model.t option React.signal = 
   let update model event =
     match event with
@@ -475,96 +475,96 @@ let game_model_s : Game.Model.t option React.signal =
       in
       { model with birds; feathers }
     | `Frame frame ->
-       when_not_paused model @@
-         let dimensions = model.background.width, model.background.height in
-         let walls =
-           model.walls
-           |> List.map (Game.Entity.move_x (-5))
-           |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
-           |> List.append (Game.Entity.init_wall frame dimensions) in
-         let homing_missiles = 
-           model.homing_missiles
-           |> List.map (
-                  Game.Entity.Homing_missile.choose_target
-                    (model.birds @ model.homing_missiles)
-                  %> (fun e -> { e with timeout = e.timeout |> CCOpt.map pred })
-                  %> Game.Entity.mark_if_collision (model.birds @ model.walls)
-                       ~change:(fun e -> {
-                                    e with
-                                    width = e.width + 100;
-                                    timeout = Some (fps *. 3. |> truncate);
-                       })
-                  %> Game.Entity.Homing_missile.move
-                )
-           |> List.filter (
-                  not % fun e -> e.timeout |> CCOpt.exists (fun t -> t < 0)
-                )
-           |> List.filter (not % Game.Entity.is_out_of_bounds dimensions)
-           |> List.append (Game.Entity.Homing_missile.init frame dimensions) in
-         let birds, feathers =
-           Game.Model.update_birds_and_feathers 
-             ~collision_entities:(walls @ homing_missiles)
-             model
-         in
-         let cookies =
-           model.cookies
-           (*goto could map 'apply_movement' here instead, which should be saved pr. entity
+      when_not_paused model @@
+      let dimensions = model.background.width, model.background.height in
+      let walls =
+        model.walls
+        |> List.map (Game.Entity.move_x (-5))
+        |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
+        |> List.append (Game.Entity.init_wall frame dimensions) in
+      let homing_missiles = 
+        model.homing_missiles
+        |> List.map (
+          Game.Entity.Homing_missile.choose_target
+            (model.birds @ model.homing_missiles)
+          %> (fun e -> { e with timeout = e.timeout |> CCOpt.map pred })
+          %> Game.Entity.mark_if_collision (model.birds @ model.walls)
+            ~change:(fun e -> {
+                  e with
+                  width = e.width + 100;
+                  timeout = Some (fps *. 3. |> truncate);
+                })
+          %> Game.Entity.Homing_missile.move
+        )
+        |> List.filter (
+          not % fun e -> e.timeout |> CCOpt.exists (fun t -> t < 0)
+        )
+        |> List.filter (not % Game.Entity.is_out_of_bounds dimensions)
+        |> List.append (Game.Entity.Homing_missile.init frame dimensions) in
+      let birds, feathers =
+        Game.Model.update_birds_and_feathers 
+          ~collision_entities:(walls @ homing_missiles)
+          model
+      in
+      let cookies =
+        model.cookies
+        (*goto could map 'apply_movement' here instead, which should be saved pr. entity
           < should also include the info about who's being followed?
-            *)
-           |> List.map (Game.Entity.move_x (-10))
-           |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
-           |> List.append (Game.Entity.init_cookie frame dimensions)
-         in
-         let scoreboard, cookies =
-           model.birds
-           |> List.fold_left (fun (scoreboard, cookies) bird -> 
-                  let cookies_left = 
-                    cookies
-                    |> List.filter (not % Game.Entity.collides [bird])
-                  in
-                  let scored_now = List.(length cookies - length cookies_left) in
-                  let scoreboard = Game.Entity.increment_score
-                                     ~scored_now
-                                     ~bird
-                                     scoreboard
-                  in
-                  scoreboard, cookies_left
-                ) (model.scoreboard, cookies)
-         in
-         {
-           birds;
-           feathers;
-           walls;
-           cookies;
-           homing_missiles;
-           scoreboard;
-           background = model.background;
-           paused = model.paused;
-         }
+        *)
+        |> List.map (Game.Entity.move_x (-10))
+        |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
+        |> List.append (Game.Entity.init_cookie frame dimensions)
+      in
+      let scoreboard, cookies =
+        model.birds
+        |> List.fold_left (fun (scoreboard, cookies) bird -> 
+            let cookies_left = 
+              cookies
+              |> List.filter (not % Game.Entity.collides [bird])
+            in
+            let scored_now = List.(length cookies - length cookies_left) in
+            let scoreboard = Game.Entity.increment_score
+                ~scored_now
+                ~bird
+                scoreboard
+            in
+            scoreboard, cookies_left
+          ) (model.scoreboard, cookies)
+      in
+      {
+        birds;
+        feathers;
+        walls;
+        cookies;
+        homing_missiles;
+        scoreboard;
+        background = model.background;
+        paused = model.paused;
+      }
     | `PauseToggle -> { model with paused = not model.paused }
     | `ViewResize dimensions ->
-       let prev_dimensions = (model.background.width, model.background.height) in
-       let reposition e =
-         Game.Entity.reposition prev_dimensions dimensions e
-       in
-       let birds = model.birds |> List.map reposition in
-       let feathers = model.feathers |> List.map reposition in
-       let walls = model.walls |> List.map reposition in
-       let cookies = model.cookies |> List.map reposition in
-       let homing_missiles = model.homing_missiles |> List.map reposition in
-       let scoreboard = model.scoreboard |> reposition in
-       let background = model.background |> Game.Entity.resize dimensions 
-       in
-       {
-         birds;
-         feathers;
-         walls;
-         background;
-         homing_missiles;
-         scoreboard;
-         cookies;
-         paused = model.paused;
-       }
+      let prev_dimensions = (model.background.width, model.background.height) in
+      let reposition e =
+        Game.Entity.reposition prev_dimensions dimensions e
+      in
+      let birds = model.birds |> List.map reposition in
+      let feathers = model.feathers |> List.map reposition in
+      let walls = model.walls |> List.map reposition in
+      let cookies = model.cookies |> List.map reposition in
+      let homing_missiles = model.homing_missiles |> List.map reposition in
+      let scoreboard = model.scoreboard |> reposition in
+      let background = model.background |> Game.Entity.resize dimensions 
+      in
+      {
+        birds;
+        feathers;
+        walls;
+        background;
+        homing_missiles;
+        scoreboard;
+        cookies;
+        paused = model.paused;
+      }
   in
   Game.Event.sink_e
   |> E.fold update (Game.Model.init (1920, 1080))
@@ -574,9 +574,9 @@ let game_model_s : Game.Model.t option React.signal =
 (**View*)
 
 let style_of_entity
-      ?extend ?extend_left ?extend_right
-      ?rotate ?background_color ?z_index ?filter
-      entity image
+    ?extend ?extend_left ?extend_right
+    ?rotate ?background_color ?z_index ?filter
+    entity image
   =
   let ext = CCOpt.get_or ~default:0 extend in
   let ext_l = CCOpt.get_or ~default:0 extend_left in
@@ -613,21 +613,19 @@ let reactive_view : Dom.node Js.t =
   let render_game_entity entity =
     begin match entity.typ with
       | `Bird {player} ->
-        begin
-          let extend = 100 in
-          let hue_rotate_degrees =
-            360. *. (float player) /. (float players) |> truncate in
-          let filter = `Hue_rotate hue_rotate_degrees in
-          let style = 
-            if entity.collided then
-              style_of_entity entity
-                ~extend ~filter ~rotate:(`Deg 90) "assets/bird.gif"
-            else
-              style_of_entity entity
-                ~extend ~filter "assets/bird.gif"
-          in
-          H.div ~a:[ H.a_style style ] []
-        end
+        let extend = 100 in
+        let hue_rotate_degrees =
+          360. *. (float player) /. (float players) |> truncate in
+        let filter = `Hue_rotate hue_rotate_degrees in
+        let style = 
+          if entity.collided then
+            style_of_entity entity
+              ~extend ~filter ~rotate:(`Deg 90) "assets/bird.gif"
+          else
+            style_of_entity entity
+              ~extend ~filter "assets/bird.gif"
+        in
+        H.div ~a:[ H.a_style style ] []
       | `Feathers player ->
         let extend = 50 in
         let hue_rotate_degrees =
@@ -652,29 +650,29 @@ let reactive_view : Dom.node Js.t =
         in
         H.div ~a:[ H.a_style style ] []
       | `Wall position ->
-         let image =
-           match position with 
-           | `Bottom -> "assets/drawn/street_light.png"
-           | `Top ->    "assets/drawn/hanging_power_cords.png"
-         in
-         let style = style_of_entity entity image in
+        let image =
+          match position with 
+          | `Bottom -> "assets/drawn/street_light.png"
+          | `Top ->    "assets/drawn/hanging_power_cords.png"
+        in
+        let style = style_of_entity entity image in
         H.div ~a:[ H.a_style style ] []
       | `Background ->
-         let style = style_of_entity entity "assets/drawn/smoggy_buildings.png" in
-         H.div ~a:[ H.a_style style ] []
+        let style = style_of_entity entity "assets/drawn/smoggy_buildings.png" in
+        H.div ~a:[ H.a_style style ] []
       | `Scoreboard score ->
         let style = style_of_entity entity "" in
         H.div ~a:[ H.a_style style ] (
-            score
-            |> IMap.bindings
-            |> CCList.flat_map (fun (player, score) -> 
-                   let content = H.txt (sp "Flap%d: %d" player score) in
-                   [
-                     H.div [ content ];
-                     H.br ();
-                   ]
-                 )
-          )
+          score
+          |> IMap.bindings
+          |> CCList.flat_map (fun (player, score) -> 
+              let content = H.txt (sp "Flap%d: %d" player score) in
+              [
+                H.div [ content ];
+                H.br ();
+              ]
+            )
+        )
     end
   in
   let render_debug_overlay entity =
@@ -741,42 +739,42 @@ let init_game () =
   let root = Dom_html.getElementById Constants.html_id in
   Dom.appendChild root reactive_view;
   Dom_html.document##.onkeydown := Dom_html.handler (fun e ->
-    Printf.printf "keycode: %d\n" e##.keyCode;
-    let _ = match e##.keyCode with
-      | 87 (*w*) -> Game.Event.sink_eupd (`WingFlap (0, `Up)) 
-      | 65 (*a*) -> Game.Event.sink_eupd (`WingFlap (0, `Left)) 
-      | 83 (*s*) -> Game.Event.sink_eupd (`WingFlap (0, `Down)) 
-      | 68 (*d*) -> Game.Event.sink_eupd (`WingFlap (0, `Right)) 
+      Printf.printf "keycode: %d\n" e##.keyCode;
+      let _ = match e##.keyCode with
+        | 87 (*w*) -> Game.Event.sink_eupd (`WingFlap (0, `Up)) 
+        | 65 (*a*) -> Game.Event.sink_eupd (`WingFlap (0, `Left)) 
+        | 83 (*s*) -> Game.Event.sink_eupd (`WingFlap (0, `Down)) 
+        | 68 (*d*) -> Game.Event.sink_eupd (`WingFlap (0, `Right)) 
 
-      | 38 (*arrow-up*)    -> Game.Event.sink_eupd (`WingFlap (1, `Up))
-      | 37 (*arrow-left*)  -> Game.Event.sink_eupd (`WingFlap (1, `Left))
-      | 40 (*arrow-down*)  -> Game.Event.sink_eupd (`WingFlap (1, `Down))
-      | 39 (*arrow-right*) -> Game.Event.sink_eupd (`WingFlap (1, `Right))
+        | 38 (*arrow-up*)    -> Game.Event.sink_eupd (`WingFlap (1, `Up))
+        | 37 (*arrow-left*)  -> Game.Event.sink_eupd (`WingFlap (1, `Left))
+        | 40 (*arrow-down*)  -> Game.Event.sink_eupd (`WingFlap (1, `Down))
+        | 39 (*arrow-right*) -> Game.Event.sink_eupd (`WingFlap (1, `Right))
 
-      | 73 (*i*) -> Game.Event.sink_eupd (`WingFlap (2, `Up))
-      | 74 (*j*) -> Game.Event.sink_eupd (`WingFlap (2, `Left))
-      | 75 (*k*) -> Game.Event.sink_eupd (`WingFlap (2, `Down))
-      | 76 (*l*) -> Game.Event.sink_eupd (`WingFlap (2, `Right))
+        | 73 (*i*) -> Game.Event.sink_eupd (`WingFlap (2, `Up))
+        | 74 (*j*) -> Game.Event.sink_eupd (`WingFlap (2, `Left))
+        | 75 (*k*) -> Game.Event.sink_eupd (`WingFlap (2, `Down))
+        | 76 (*l*) -> Game.Event.sink_eupd (`WingFlap (2, `Right))
 
-      | 80 (*p*) -> Game.Event.sink_eupd `PauseToggle
-      | _ -> ()
-    in
-    Js._true
-  );
+        | 80 (*p*) -> Game.Event.sink_eupd `PauseToggle
+        | _ -> ()
+      in
+      Js._true
+    );
   update_view_size () |> ignore;
   Dom_html.window##.onresize := Dom_html.handler (fun _ ->
-    update_view_size () |> ignore;
-    Js._true
-  )
+      update_view_size () |> ignore;
+      Js._true
+    )
 
 let main () =
   Dom_html.window##.onload := Dom_html.handler (fun _ -> 
-    Random.self_init ();
-    (* Game.Event.sink_eupd (`Frame 0); (\*for debug*\) *)
-    init_game ();
-    Game.Event.feed_frp ();
-    Js._false
-  )
+      Random.self_init ();
+      (* Game.Event.sink_eupd (`Frame 0); (\*for debug*\) *)
+      init_game ();
+      Game.Event.feed_frp ();
+      Js._false
+    )
 
 let _ = main ()
 
