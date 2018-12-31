@@ -25,8 +25,10 @@ module Game = struct
 
   module Event = struct
 
+    type direction = [ `Left | `Right | `Up | `Down ]
+    
     type t = [
-      | `WingFlap of int (*player*) * [ `Left | `Right | `Up | `Down ]
+      | `WingFlap of int (*player*) * direction
       | `Frame of int
       | `ViewResize of int * int
       | `PauseToggle 
@@ -77,7 +79,7 @@ module Game = struct
 
       type scoreboard = [ `Scoreboard of (int IMap.t [@printer IMap.pp CCInt.pp CCInt.pp]) ]
       [@@deriving show]
-      
+
       type typ = [
         | bird
         | cookie
@@ -88,8 +90,10 @@ module Game = struct
         | homing_missile_data homing_missile
       ][@@deriving show]
 
+      and target = [ bird | homing_missile_data homing_missile ]
+      
       and homing_missile_data = {
-        target : [ bird | homing_missile_data homing_missile ] t option;
+        target : target t option;
         movement_vector : V2.t;
       }[@@deriving show]
 
@@ -106,6 +110,24 @@ module Game = struct
     end
 
     include T
+
+    module To_typ = struct 
+    
+      let birds x = (x : bird t list :> typ t list)
+      let walls x = (x : wall t list :> typ t list)
+      let homing_missiles x =
+        (x : homing_missile_data homing_missile t list :> typ t list)
+      (*goto add coercion helpers for other types too*)
+
+    end
+
+    module To_target = struct 
+
+      let birds x = (x : bird t list :> target t list)
+      let homing_missiles x =
+        (x : homing_missile_data homing_missile t list :> target t list)
+
+    end
 
     let distance e e' =
       let x , y  = float e.pos_x, float e.pos_y in
@@ -180,37 +202,35 @@ module Game = struct
         timeout = None;
       }
 
-      let move direction bird =
-        match bird.typ with
-        | `Bird bird_data ->
-          let fall_vector = V2.v 0. 11. in
-          let slowdown = 0.9 in
-          let movement_vector =
-            if bird.collided then
-              fall_vector
-            else begin
-              match direction with
-              | None -> V2.(slowdown * bird_data.movement_vector)
-              | Some direction -> 
-                let direction_vec = match direction with
-                  | `Up    -> V2.v    0. (-70.)
-                  | `Down  -> V2.v    0.   35.
-                  | `Left  -> V2.v (-35.)   0.
-                  | `Right -> V2.v   35.    0.
-                in
-                let movement_vec =
-                  V2.(bird_data.movement_vector + direction_vec)
-                in
-                V2.(slowdown * movement_vec)
-            end
-          in
-          let final_vector = V2.(movement_vector + fall_vector) in
-          { bird with
-            typ = `Bird { bird_data with movement_vector };
-            pos_x = bird.pos_x + (truncate V2.(x final_vector));
-            pos_y = bird.pos_y + (truncate V2.(y final_vector));
-          }
-        | _ -> bird (*goto make 'log_and_return "tag" entity' a helper *)
+      let move : Event.direction option -> bird t -> bird t =
+        fun direction ({ typ = `Bird bird_data } as bird) -> 
+        let fall_vector = V2.v 0. 11. in
+        let slowdown = 0.9 in
+        let movement_vector =
+          if bird.collided then
+            fall_vector
+          else begin
+            match direction with
+            | None -> V2.(slowdown * bird_data.movement_vector)
+            | Some direction -> 
+              let direction_vec = match direction with
+                | `Up    -> V2.v    0. (-70.)
+                | `Down  -> V2.v    0.   35.
+                | `Left  -> V2.v (-35.)   0.
+                | `Right -> V2.v   35.    0.
+              in
+              let movement_vec =
+                V2.(bird_data.movement_vector + direction_vec)
+              in
+              V2.(slowdown * movement_vec)
+          end
+        in
+        let final_vector = V2.(movement_vector + fall_vector) in
+        { bird with
+          typ = `Bird { bird_data with movement_vector };
+          pos_x = bird.pos_x + (truncate V2.(x final_vector));
+          pos_y = bird.pos_y + (truncate V2.(y final_vector));
+        }
 
     end
 
@@ -224,9 +244,6 @@ module Game = struct
             collided = false;
             timeout = None
           }
-        | _ ->
-          log "Was not a bird!\n";
-          bird
 
     end
 
@@ -316,7 +333,7 @@ module Game = struct
           ]
         )
 
-      let choose_target targets missile =
+      let choose_target targets ({ typ = `Homing_missile missile_data } as missile) =
         let target =
           List.fold_left (fun acc e ->
               match acc with
@@ -336,14 +353,9 @@ module Game = struct
                 in Some chosen
             ) None targets
         in
-        match missile.typ with
-        | `Homing_missile missile_data ->
-          { missile with typ = `Homing_missile {
-                missile_data with target;
-              }}
-        | _ ->
-          log "choose_target: was not a missile!\n";
-          missile
+        { missile with typ = `Homing_missile {
+              missile_data with target;
+            }}
 
       let move missile =
         match missile.typ with
@@ -385,19 +397,17 @@ module Game = struct
         timeout = None;
       }
 
-      let increment ~scored_now ~bird e =
-        match e.typ, bird.typ with
-        | `Scoreboard scores, `Bird {player} ->
-          let scores =
-            scores |> IMap.update player (function
-                | None -> Some scored_now
-                | Some score -> Some (scored_now + score)
-              )
-          in
-          { e with typ = `Scoreboard scores }
-        | typ ->
-          log "this was not a scoreboard+bird !\n";
-          e
+      let increment
+          ~scored_now
+          ~bird:({ typ = `Bird {player} })
+          ({ typ = `Scoreboard scores } as scoreboard) =
+        let scores =
+          scores |> IMap.update player (function
+              | None -> Some scored_now
+              | Some score -> Some (scored_now + score)
+            )
+        in
+        { scoreboard with typ = `Scoreboard scores }
 
     end
 
@@ -457,15 +467,17 @@ module Game = struct
       =
       (*Moving birds and spawning feathers*)
       let init = [], model.feathers in
+      let open Entity.T in
       let birds, feathers =
-        model.birds |> List.fold_left (fun (acc_birds, acc_feathers) bird -> 
-            match bird.Entity.typ with
-            | `Bird bird_data when
-                begin match player_and_direction with
-                  | Some (player, _) -> player = bird_data.player
-                  | None -> true
-                end
-              -> 
+        model.birds |> List.fold_left (
+          fun (acc_birds, acc_feathers) ({ typ = `Bird bird_data } as bird) -> 
+            let should_move = match player_and_direction with
+              | Some (player, _) -> player = bird_data.player
+              | None -> true
+            in
+            if not should_move then
+              bird :: acc_birds, acc_feathers
+            else begin
               let bird, just_collided =
                 let bird' = 
                   bird
@@ -479,57 +491,46 @@ module Game = struct
                 bird :: acc_birds, feathers :: acc_feathers
               else
                 bird :: acc_birds, acc_feathers
-            | _ ->
-              bird :: acc_birds, acc_feathers
-          ) init
+            end
+        ) init
       in
       (*Resetting birds and removing feathers*)
       let birds_assoc, feathers =
+        let open Entity.T in
         let birds_of_players =
-          birds |> List.map (function
-              | { Entity.typ = `Bird {player} } as e -> player, e
-              | e ->
-                log "birds_of_players: Wasn't a bird!\n";
-                -1, e
-            )
+          birds |> List.map (
+            fun ({ Entity.typ = `Bird {player} } as e) -> player, e
+          )
         in
         let init = birds_of_players, [] in
         feathers
-        |> List.fold_left (fun (acc_birds, feathers_left) feather ->
-            begin match feather.Entity.typ with
-              | `Feathers feather_player -> 
-                let other_birds =
-                  birds |> List.filter (fun others bird ->
-                      match bird.Entity.typ with
-                      | `Bird {player} -> not (player = feather_player)
-                      | _ -> true
-                    ) []
-                in
-                let open Entity.T in
-                if feather |> Entity.collides other_birds then
-                  let revive_bird = function
-                    | None -> None
-                    | Some bird -> 
-                      Some { bird with
-                             pos_x = feather.pos_x;
-                             pos_y = feather.pos_y;
-                             collided = false;
-                             timeout = None;
-                           }
-                  in
-                  let acc_birds =
-                    CCList.Assoc.update revive_bird
-                      feather_player
-                      acc_birds
-                      ~eq:CCInt.equal
-                  in
-                  acc_birds, feathers_left
-                else 
-                  acc_birds, feather :: feathers_left
-              | _ -> failwith "Wrong entity type"
-              (*< goto find better way to model types of entities?*)
-            end
-          ) init
+        |> List.fold_left (
+          fun (acc_birds, feathers_left) ({ typ = `Feathers feather_player } as feather) ->
+            let other_birds =
+              birds |> List.filter (
+                fun { Entity.typ = `Bird {player} } -> not (player = feather_player)
+              )
+            in
+            if feather |> Entity.collides other_birds then
+              let revive_bird = function
+                | None -> None
+                | Some bird -> 
+                  Some { bird with
+                         pos_x = feather.pos_x;
+                         pos_y = feather.pos_y;
+                         collided = false;
+                         timeout = None;
+                       }
+              in
+              let acc_birds =
+                CCList.Assoc.update ~eq:CCInt.equal revive_bird
+                  feather_player
+                  acc_birds
+              in
+              acc_birds, feathers_left
+            else 
+              acc_birds, feather :: feathers_left
+        ) init
       in
       let birds = birds_assoc |> List.map snd in
       birds, feathers
@@ -554,7 +555,10 @@ let game_model_s : Game.Model.t option React.signal =
       let birds, feathers =
         Game.Model.update_birds_and_feathers
           ~player_and_direction:(player, direction)
-          ~collision_entities:(model.walls @ model.homing_missiles)
+          ~collision_entities:(
+            (model.walls           |> Game.Entity.To_typ.walls) @
+            (model.homing_missiles |> Game.Entity.To_typ.homing_missiles)
+          )
           model
       in
       { model with birds; feathers }
@@ -569,10 +573,15 @@ let game_model_s : Game.Model.t option React.signal =
       let homing_missiles = 
         model.homing_missiles
         |> List.map (
-          Game.Entity.Homing_missile.choose_target
-            (model.birds @ model.homing_missiles)
+          Game.Entity.Homing_missile.choose_target (
+            (model.birds           |> Game.Entity.To_target.birds) @
+            (model.homing_missiles |> Game.Entity.To_target.homing_missiles)
+          )
           %> (fun e -> { e with timeout = e.timeout |> CCOpt.map pred })
-          %> Game.Entity.mark_if_collision (model.birds @ model.walls)
+          %> Game.Entity.mark_if_collision (
+            (model.birds |> Game.Entity.To_typ.birds) @
+            (model.walls |> Game.Entity.To_typ.walls)
+          )
             ~change:(fun e -> {
                   e with
                   width = e.width + 100;
@@ -587,14 +596,14 @@ let game_model_s : Game.Model.t option React.signal =
         |> List.append (Game.Entity.Homing_missile.init frame dimensions) in
       let birds, feathers =
         Game.Model.update_birds_and_feathers 
-          ~collision_entities:(walls @ homing_missiles)
+          ~collision_entities:(
+            (walls |> Game.Entity.To_typ.walls) @
+            (homing_missiles |> Game.Entity.To_typ.homing_missiles)
+          )
           model
       in
       let cookies =
         model.cookies
-        (*goto could map 'apply_movement' here instead, which should be saved pr. entity
-          < should also include the info about who's being followed?
-        *)
         |> List.map (Game.Entity.move_x (-10))
         |> List.filter (not % (Game.Entity.is_out_of_bounds dimensions))
         |> List.append (Game.Entity.init_cookie frame dimensions)
