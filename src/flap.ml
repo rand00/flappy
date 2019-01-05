@@ -236,14 +236,12 @@ module Game = struct
 
     module Feathers = struct
 
-      let of_bird bird =
-        match bird.typ with
-        | `Bird bird_data -> 
-          { bird with
-            typ = `Feathers bird_data.player;
-            collided = false;
-            timeout = None
-          }
+      let of_bird ({ typ = `Bird bird_data } as bird) =
+        { bird with
+          typ = `Feathers bird_data.player;
+          collided = false;
+          timeout = None
+        }
 
     end
 
@@ -357,31 +355,28 @@ module Game = struct
               missile_data with target;
             }}
 
-      let move missile =
-        match missile.typ with
-        | `Homing_missile missile_data -> 
-          let movement_vector =
-            if missile.collided then
-              V2.v 0. 0.
-            else begin
+      let move ({ typ = `Homing_missile missile_data } as missile) =
+        let movement_vector =
+          if missile.collided then
+            V2.v 0. 0.
+          else begin
               match missile_data.target with
               | None -> missile_data.movement_vector
               | Some target ->
-                let target_vec = V2.v (float target.pos_x) (float target.pos_y) in
-                let missile_vec = V2.v (float missile.pos_x) (float missile.pos_y) in
-                let diff_vec = V2.(target_vec - missile_vec) in
-                (* let dist = V2.norm diff_vec in *)
-                (* let dist_factor = min (0.000030 *. sqrt dist) 0.1 in *)
-                let dist_factor = 0.003 in
-                V2.(missile_data.movement_vector + (dist_factor * diff_vec))
+                 let target_vec = V2.v (float target.pos_x) (float target.pos_y) in
+                 let missile_vec = V2.v (float missile.pos_x) (float missile.pos_y) in
+                 let diff_vec = V2.(target_vec - missile_vec) in
+                 (* let dist = V2.norm diff_vec in *)
+                 (* let dist_factor = min (0.000030 *. sqrt dist) 0.1 in *)
+                 let dist_factor = 0.003 in
+                 V2.(missile_data.movement_vector + (dist_factor * diff_vec))
             end
-          in
-          { missile with
-            typ = `Homing_missile { missile_data with movement_vector };
-            pos_x = missile.pos_x + (truncate V2.(x movement_vector));
-            pos_y = missile.pos_y + (truncate V2.(y movement_vector));
-          }
-        | _ -> missile (*goto make 'log_and_return "tag" entity' a helper *)
+        in
+        { missile with
+          typ = `Homing_missile { missile_data with movement_vector };
+          pos_x = missile.pos_x + (truncate V2.(x movement_vector));
+          pos_y = missile.pos_y + (truncate V2.(y movement_vector));
+        }
 
     end
 
@@ -597,7 +592,7 @@ let game_model_s : Game.Model.t option React.signal =
       let birds, feathers =
         Game.Model.update_birds_and_feathers 
           ~collision_entities:(
-            (walls |> Game.Entity.To_typ.walls) @
+            (walls           |> Game.Entity.To_typ.walls) @
             (homing_missiles |> Game.Entity.To_typ.homing_missiles)
           )
           model
