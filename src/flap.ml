@@ -567,12 +567,13 @@ let game_model_s : Game.Model.t option React.signal =
         |> List.append (Game.Entity.init_wall frame dimensions) in
       let homing_missiles = 
         model.homing_missiles
+        |> List.map (fun e -> { e with timeout = e.timeout |> CCOpt.map pred })
+        |> List.filter (not % fun e -> e.timeout |> CCOpt.exists (fun t -> t < 0))
         |> List.map (
           Game.Entity.Homing_missile.choose_target (
             (model.birds           |> Game.Entity.To_target.birds) @
             (model.homing_missiles |> Game.Entity.To_target.homing_missiles)
           )
-          %> (fun e -> { e with timeout = e.timeout |> CCOpt.map pred })
           %> Game.Entity.mark_if_collision (
             (model.birds |> Game.Entity.To_typ.birds) @
             (model.walls |> Game.Entity.To_typ.walls)
@@ -583,9 +584,6 @@ let game_model_s : Game.Model.t option React.signal =
                   timeout = Some (fps *. 3. |> truncate);
                 })
           %> Game.Entity.Homing_missile.move
-        )
-        |> List.filter (
-          not % fun e -> e.timeout |> CCOpt.exists (fun t -> t < 0)
         )
         |> List.filter (not % Game.Entity.is_out_of_bounds dimensions)
         |> List.append (Game.Entity.Homing_missile.init frame dimensions) in
