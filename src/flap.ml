@@ -22,6 +22,7 @@ let debug = false
 let fps = 30.
 let players = 3
 
+(*Note: Intentionally evaluating else-case to test performance*)
 let when_not_paused model model' =
   if model.paused then model else model'
 
@@ -146,9 +147,34 @@ let game_model_s : GameModel.t option React.signal =
 let update_view_size () =
   let (>>=) = Js.Optdef.bind in
   let (>>|) = Js.Optdef.map in
-  Dom_html.window##.innerWidth >>= fun w ->
-  Dom_html.window##.innerHeight >>| fun h ->
-  GameEvent.sink_eupd (`ViewResize (w, h))
+  begin
+    Dom_html.window##.innerWidth >>= fun w ->
+    Dom_html.window##.innerHeight >>| fun h ->
+    GameEvent.sink_eupd (`ViewResize (w, h))
+  end |> ignore
+
+let handle_keypresses ev =
+  Printf.printf "keycode: %d\n" ev##.keyCode;
+  let _ = match ev##.keyCode with
+    | 87 (*w*) -> GameEvent.sink_eupd (`WingFlap (0, `Up)) 
+    | 65 (*a*) -> GameEvent.sink_eupd (`WingFlap (0, `Left)) 
+    | 83 (*s*) -> GameEvent.sink_eupd (`WingFlap (0, `Down)) 
+    | 68 (*d*) -> GameEvent.sink_eupd (`WingFlap (0, `Right)) 
+
+    | 38 (*arrow-up*)    -> GameEvent.sink_eupd (`WingFlap (1, `Up))
+    | 37 (*arrow-left*)  -> GameEvent.sink_eupd (`WingFlap (1, `Left))
+    | 40 (*arrow-down*)  -> GameEvent.sink_eupd (`WingFlap (1, `Down))
+    | 39 (*arrow-right*) -> GameEvent.sink_eupd (`WingFlap (1, `Right))
+
+    | 73 (*i*) -> GameEvent.sink_eupd (`WingFlap (2, `Up))
+    | 74 (*j*) -> GameEvent.sink_eupd (`WingFlap (2, `Left))
+    | 75 (*k*) -> GameEvent.sink_eupd (`WingFlap (2, `Down))
+    | 76 (*l*) -> GameEvent.sink_eupd (`WingFlap (2, `Right))
+
+    | 80 (*p*) -> GameEvent.sink_eupd `PauseToggle
+    | _ -> ()
+  in
+  Js._true
 
 let init_game () =
   let root = Dom_html.getElementById Constants.html_id in
@@ -159,39 +185,16 @@ let init_game () =
       ~game_model_s
   in
   Dom.appendChild root reactive_view;
-  Dom_html.document##.onkeydown := Dom_html.handler (fun e ->
-      Printf.printf "keycode: %d\n" e##.keyCode;
-      let _ = match e##.keyCode with
-        | 87 (*w*) -> GameEvent.sink_eupd (`WingFlap (0, `Up)) 
-        | 65 (*a*) -> GameEvent.sink_eupd (`WingFlap (0, `Left)) 
-        | 83 (*s*) -> GameEvent.sink_eupd (`WingFlap (0, `Down)) 
-        | 68 (*d*) -> GameEvent.sink_eupd (`WingFlap (0, `Right)) 
-
-        | 38 (*arrow-up*)    -> GameEvent.sink_eupd (`WingFlap (1, `Up))
-        | 37 (*arrow-left*)  -> GameEvent.sink_eupd (`WingFlap (1, `Left))
-        | 40 (*arrow-down*)  -> GameEvent.sink_eupd (`WingFlap (1, `Down))
-        | 39 (*arrow-right*) -> GameEvent.sink_eupd (`WingFlap (1, `Right))
-
-        | 73 (*i*) -> GameEvent.sink_eupd (`WingFlap (2, `Up))
-        | 74 (*j*) -> GameEvent.sink_eupd (`WingFlap (2, `Left))
-        | 75 (*k*) -> GameEvent.sink_eupd (`WingFlap (2, `Down))
-        | 76 (*l*) -> GameEvent.sink_eupd (`WingFlap (2, `Right))
-
-        | 80 (*p*) -> GameEvent.sink_eupd `PauseToggle
-        | _ -> ()
-      in
-      Js._true
-    );
-  update_view_size () |> ignore;
+  Dom_html.document##.onkeydown := Dom_html.handler handle_keypresses;
+  update_view_size ();
   Dom_html.window##.onresize := Dom_html.handler (fun _ ->
-      update_view_size () |> ignore;
+      update_view_size ();
       Js._true
     )
 
 let main () =
   Dom_html.window##.onload := Dom_html.handler (fun _ -> 
       Random.self_init ();
-      (* GameEvent.sink_eupd (`Frame 0); (\*for debug*\) *)
       init_game ();
       GameEvent.feed_frp ~fps;
       Js._false

@@ -22,18 +22,18 @@ let to_list : t -> GameEntity.typ GameEntity.t list =
   fun m ->
   let module Entity = GameEntity in
   List.flatten [
-      [ (m.background    : Entity.background Entity.t  :> Entity.typ Entity.t) ];
-      (m.feathers        : Entity.feathers Entity.t list :> Entity.typ Entity.t list);
-      (m.walls           : Entity.wall Entity.t list   :> Entity.typ Entity.t list);
-      (m.cookies         : Entity.cookie Entity.t list :> Entity.typ Entity.t list);
-      (m.birds           : Entity.bird Entity.t list   :> Entity.typ Entity.t list);
-      (m.homing_missiles :
-         Entity.homing_missile_data
-           Entity.homing_missile Entity.t list
-       :> Entity.typ Entity.t list
-      );
-      [ (m.scoreboard    : Entity.scoreboard Entity.t :> Entity.typ Entity.t) ];
-    ]
+    [ (m.background : Entity.background Entity.t  :> Entity.typ Entity.t) ];
+    (m.feathers     : Entity.feathers Entity.t list :> Entity.typ Entity.t list);
+    (m.walls        : Entity.wall Entity.t list   :> Entity.typ Entity.t list);
+    (m.cookies      : Entity.cookie Entity.t list :> Entity.typ Entity.t list);
+    (m.birds        : Entity.bird Entity.t list   :> Entity.typ Entity.t list);
+    (m.homing_missiles :
+       Entity.homing_missile_data
+         Entity.homing_missile Entity.t list
+     :> Entity.typ Entity.t list
+    );
+    [ (m.scoreboard    : Entity.scoreboard Entity.t :> Entity.typ Entity.t) ];
+  ]
 
 let init ~view_dimensions ~players = {
   paused = false;
