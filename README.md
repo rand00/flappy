@@ -5,6 +5,7 @@ libraries, to write powerful but simple code with an Elm-like structure.
 See `flap.ml` for the game-code.
 
 ### Updates
+* Made code more typesafe using subtyping with polymorphic variants 
 * Other birds can now revive a fallen bird by flying into feathers
 * Begun drawing own assets
 * Added local multiplayer
@@ -12,7 +13,7 @@ See `flap.ml` for the game-code.
 * Added homing dogs 
 * ... 
 
-### Goals:
+### Goals
 - [x] Elm-like code using frp (`react`) + typesafe html (`tyxml`) + 
 virtual DOM (`reactiveData` + `tyxml_js`). 
   * Simple
