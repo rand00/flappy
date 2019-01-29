@@ -157,7 +157,7 @@ let make_view :
   in
   let rlist_entity =
     game_model_s |> S.map (fun model_opt ->
-        log "game_model update\n";
+        (* log "game_model update\n"; *)
         model_opt
         |> CCOpt.to_list
         |> CCList.flat_map GameModel.to_list

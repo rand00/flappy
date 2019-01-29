@@ -144,6 +144,8 @@ let game_model_s : GameModel.t option React.signal =
   |> E.map CCOpt.pure
   |> S.hold None
 
+(**Imperative code - initialization and updating graph*)
+
 let update_view_size () =
   let (>>=) = Js.Optdef.bind in
   let (>>|) = Js.Optdef.map in
@@ -177,6 +179,7 @@ let handle_keypresses ev =
   Js._true
 
 let init_game () =
+  Random.self_init ();
   let root = Dom_html.getElementById Constants.html_id in
   let reactive_view =
     GameView.make_view
@@ -190,13 +193,12 @@ let init_game () =
   Dom_html.window##.onresize := Dom_html.handler (fun _ ->
       update_view_size ();
       Js._true
-    )
+    );
+  GameEvent.feed_frp ~fps
 
 let main () =
   Dom_html.window##.onload := Dom_html.handler (fun _ -> 
-      Random.self_init ();
       init_game ();
-      GameEvent.feed_frp ~fps;
       Js._false
     )
 
