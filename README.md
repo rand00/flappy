@@ -4,6 +4,9 @@ Primary point of this is to showcase how to use OCaml and its existing
 libraries, to write powerful but simple code with an Elm-like structure. 
 See `flap.ml` for the game-code.
 
+#### Temporary download link for compiled code
+https://mega.nz/#!5hNTWYZS!Y-8iWdkB8bcFnuo4y1GlqIbYxDgzByXKB7EtWAkj_Lk 
+
 ### Updates
 * Made code more typesafe using subtyping with polymorphic variants 
 * Other birds can now revive a fallen bird by flying into feathers
