@@ -109,7 +109,7 @@ let update_birds_and_feathers
                    }
           in
           let acc_birds =
-            CCList.Assoc.update ~eq:CCInt.equal revive_bird
+            CCList.Assoc.update ~eq:CCInt.equal ~f:revive_bird
               feather_player
               acc_birds
           in
